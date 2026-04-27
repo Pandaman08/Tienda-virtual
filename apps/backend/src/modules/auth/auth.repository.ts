@@ -1,4 +1,5 @@
 import { prisma } from "../../config/prisma";
+import { Prisma } from "@prisma/client";
 
 export const authRepository = {
   findUsuarioByEmail: (email: string) =>
@@ -11,7 +12,7 @@ export const authRepository = {
     telefono?: string;
     passwordHash: string;
   }) => {
-    return prisma.$transaction(async (tx) => {
+    return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const cliente = await tx.cli_clientes.create({
         data: {
           nombre: input.nombre,

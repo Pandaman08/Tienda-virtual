@@ -28,7 +28,12 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction):
   }
 
   try {
-    const payload = jwt.verify(token, env.JWT_ACCESS_SECRET) as JwtPayload;
+    const raw = jwt.verify(token, env.JWT_ACCESS_SECRET) as unknown;
+    if (typeof raw !== "object" || raw === null || !("sub" in raw) || !("rol" in raw)) {
+      throw new Error("Token invalido");
+    }
+
+    const payload = raw as JwtPayload;
     req.user = payload;
     next();
   } catch {

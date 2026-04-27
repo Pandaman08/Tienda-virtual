@@ -133,6 +133,11 @@ INSERT INTO cli_clientes (nombre, apellido, email, telefono) VALUES
 ('Luis', 'Perez', 'luis@example.com', '222222222'),
 ('Marta', 'Gomez', 'marta@example.com', '333333333');
 
+INSERT INTO seg_usuarios (rol_id, cliente_id, email, password_hash, activo, created_at, updated_at) VALUES
+((SELECT id FROM seg_roles WHERE nombre = 'ADMIN'), NULL, 'admin@tienda.com', '$2b$10$s07ZfoKp8HU1HBOTwxe2LemC0btSgezBAOlb3OEozMlsKBxs787ES', TRUE, NOW(), NOW()),
+((SELECT id FROM seg_roles WHERE nombre = 'CLIENTE'), (SELECT id FROM cli_clientes WHERE email = 'ana@example.com'), 'ana@example.com', '$2b$10$cNqlhSE.QR99tfDSKQAzZ.dYJPW89G9jJ1ajUtiRZm0geldBYeHGq', TRUE, NOW(), NOW())
+ON CONFLICT (email) DO NOTHING;
+
 INSERT INTO cat_productos (sku, nombre, descripcion, categoria, precio, stock_minimo) VALUES
 ('SKU-001', 'Laptop Pro 14', 'Laptop de alto rendimiento', 'Computacion', 5200.00, 2),
 ('SKU-002', 'Mouse Inalambrico', 'Mouse ergonomico', 'Accesorios', 120.00, 10),
@@ -157,3 +162,33 @@ INSERT INTO cat_productos (sku, nombre, descripcion, categoria, precio, stock_mi
 
 INSERT INTO inv_inventario (producto_id, stock_actual, stock_reservado, stock_disponible)
 SELECT id, 25, 2, 23 FROM cat_productos;
+
+INSERT INTO ord_ordenes (cliente_id, numero_orden, subtotal, impuestos, total, estado, metodo_pago, activo, created_at, updated_at) VALUES
+((SELECT id FROM cli_clientes WHERE email = 'ana@example.com'), 'ORD-0001', 5600.00, 1008.00, 6608.00, 'PAGADA', 'TARJETA', TRUE, NOW() - INTERVAL '20 days', NOW() - INTERVAL '20 days'),
+((SELECT id FROM cli_clientes WHERE email = 'luis@example.com'), 'ORD-0002', 980.00, 176.40, 1156.40, 'PAGADA', 'YAPE', TRUE, NOW() - INTERVAL '10 days', NOW() - INTERVAL '10 days'),
+((SELECT id FROM cli_clientes WHERE email = 'marta@example.com'), 'ORD-0003', 3300.00, 594.00, 3894.00, 'PAGADA', 'TARJETA', TRUE, NOW() - INTERVAL '3 days', NOW() - INTERVAL '3 days')
+ON CONFLICT (numero_orden) DO NOTHING;
+
+INSERT INTO ord_orden_items (orden_id, producto_id, cantidad, precio_unitario, total_linea, activo, created_at, updated_at)
+SELECT o.id, p.id, x.cantidad, x.precio_unitario, x.total_linea, TRUE, NOW(), NOW()
+FROM (
+    VALUES
+        ('ORD-0001', 'SKU-001', 1, 5200.00, 5200.00),
+        ('ORD-0001', 'SKU-002', 2, 120.00, 240.00),
+        ('ORD-0001', 'SKU-010', 1, 60.00, 60.00),
+        ('ORD-0001', 'SKU-008', 1, 290.00, 290.00),
+        ('ORD-0001', 'SKU-018', 1, 190.00, 190.00),
+        ('ORD-0001', 'SKU-016', 1, 340.00, 340.00),
+        ('ORD-0002', 'SKU-009', 1, 980.00, 980.00),
+        ('ORD-0003', 'SKU-019', 1, 3200.00, 3200.00),
+        ('ORD-0003', 'SKU-010', 1, 60.00, 60.00),
+        ('ORD-0003', 'SKU-002', 1, 40.00, 40.00)
+) AS x(numero_orden, sku, cantidad, precio_unitario, total_linea)
+JOIN ord_ordenes o ON o.numero_orden = x.numero_orden
+JOIN cat_productos p ON p.sku = x.sku
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM ord_orden_items oi
+    WHERE oi.orden_id = o.id
+        AND oi.producto_id = p.id
+);

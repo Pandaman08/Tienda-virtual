@@ -1,4 +1,5 @@
 import { prisma } from "../../config/prisma";
+import { Prisma } from "@prisma/client";
 
 export const ordenesRepository = {
   getCarritoWithItems: (clienteId: number) =>
@@ -17,11 +18,11 @@ export const ordenesRepository = {
       throw new Error("Carrito vacio");
     }
 
-    const subtotal = carrito.items.reduce((acc, item) => acc + Number(item.precio_unitario) * item.cantidad, 0);
+    const subtotal = carrito.items.reduce((acc: number, item) => acc + Number(item.precio_unitario) * item.cantidad, 0);
     const impuestos = subtotal * 0.18;
     const total = subtotal + impuestos;
 
-    return prisma.$transaction(async (tx) => {
+    return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const orden = await tx.ord_ordenes.create({
         data: {
           cliente_id: clienteId,

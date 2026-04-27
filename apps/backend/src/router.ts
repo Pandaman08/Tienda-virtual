@@ -6,6 +6,7 @@ import { ordenesRoutes } from "./modules/ordenes/ordenes.routes";
 import { inventarioRoutes } from "./modules/inventario/inventario.routes";
 import { clientesRoutes } from "./modules/clientes/clientes.routes";
 import { reportesRoutes } from "./modules/reportes/reportes.routes";
+import { usuariosRoutes } from "./modules/usuarios/usuarios.routes";
 
 export const router = Router();
 
@@ -20,3 +21,4 @@ router.use("/ordenes", ordenesRoutes);
 router.use("/inventario", inventarioRoutes);
 router.use("/clientes", clientesRoutes);
 router.use("/reportes", reportesRoutes);
+router.use("/usuarios", usuariosRoutes);

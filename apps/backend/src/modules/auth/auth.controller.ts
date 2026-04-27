@@ -21,7 +21,12 @@ export const authController = {
 
   refresh: async (req: Request, res: Response) => {
     const token = req.body.refreshToken as string;
-    const payload = jwt.verify(token, env.JWT_REFRESH_SECRET) as { sub: number; rol: "ADMIN" | "CLIENTE" };
+    const raw = jwt.verify(token, env.JWT_REFRESH_SECRET) as unknown;
+    if (typeof raw !== "object" || raw === null || !("sub" in raw) || !("rol" in raw)) {
+      throw new Error("Refresh token invalido");
+    }
+
+    const payload = raw as { sub: number; rol: "ADMIN" | "CLIENTE" };
     const data = await authService.refresh(payload.sub, token, payload.rol);
     res.status(StatusCodes.OK).json(ok("Token actualizado", data));
   }

@@ -4,7 +4,7 @@ export const carritoService = {
   getMine: async (clienteId: number) => {
     const carrito = await carritoRepository.getOrCreateCarrito(clienteId);
     const items = await carritoRepository.listItems(carrito.id);
-    const subtotal = items.reduce((acc, item) => acc + Number(item.precio_unitario) * item.cantidad, 0);
+    const subtotal = items.reduce((acc: number, item) => acc + Number(item.precio_unitario) * item.cantidad, 0);
     return { carrito, items, subtotal };
   },
 
