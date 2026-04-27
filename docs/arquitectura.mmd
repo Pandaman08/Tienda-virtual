@@ -1,0 +1,30 @@
+flowchart LR
+    U[Usuario Cliente/Admin] -->|HTTPS/JSON| FE[Frontend SPA React 18 + TS]
+    FE -->|Axios + JWT| API[Backend API Express /api/v1]
+
+    subgraph BFF[Backend Node.js + Express + TypeScript]
+      RT[Routes]
+      MW[Middlewares\nAuth JWT + RBAC\nRate Limit + CORS\nZod Validation]
+      CT[Controllers]
+      SV[Services]
+      RP[Repositories]
+      DOC[Swagger/OpenAPI]
+      LOG[Winston Logger]
+      PDF[Reportes PDF\nPDFKit + Puppeteer]
+    end
+
+    API --> RT --> MW --> CT --> SV --> RP
+    SV --> PDF
+    API --> DOC
+    API --> LOG
+
+    RP -->|Prisma ORM| DB[(PostgreSQL)]
+    DB -->|SQL + Indices + Constraints| AUD[(Auditoria\ncreated_at/updated_at/activo)]
+
+    FE -->|React Query + Zustand| ST[(Estado UI)]
+    FE -->|Recharts| DASH[Dashboard KPI]
+
+    classDef capa fill:#d6f5e3,stroke:#0f5132,stroke-width:1px;
+    classDef data fill:#fff3cd,stroke:#664d03,stroke-width:1px;
+    class FE,API,BFF capa;
+    class DB,AUD,ST,DASH data;

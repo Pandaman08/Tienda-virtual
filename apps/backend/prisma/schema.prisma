@@ -1,0 +1,168 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model seg_roles {
+  id          Int           @id @default(autoincrement())
+  nombre      String        @unique @db.VarChar(30)
+  descripcion String?       @db.VarChar(120)
+  activo      Boolean       @default(true)
+  created_at  DateTime      @default(now())
+  updated_at  DateTime      @updatedAt
+  usuarios    seg_usuarios[]
+
+  @@map("seg_roles")
+}
+
+model cli_clientes {
+  id         Int           @id @default(autoincrement())
+  nombre     String        @db.VarChar(80)
+  apellido   String        @db.VarChar(80)
+  email      String        @unique @db.VarChar(120)
+  telefono   String?       @db.VarChar(30)
+  activo     Boolean       @default(true)
+  created_at DateTime      @default(now())
+  updated_at DateTime      @updatedAt
+  usuarios   seg_usuarios[]
+  carritos   ord_carritos[]
+  ordenes    ord_ordenes[]
+
+  @@map("cli_clientes")
+}
+
+model seg_usuarios {
+  id                 Int                     @id @default(autoincrement())
+  rol_id             Int
+  cliente_id         Int?
+  email              String                  @unique @db.VarChar(120)
+  password_hash      String                  @db.VarChar(255)
+  refresh_token_hash String?                 @db.VarChar(255)
+  activo             Boolean                 @default(true)
+  created_at         DateTime                @default(now())
+  updated_at         DateTime                @updatedAt
+  rol                seg_roles               @relation(fields: [rol_id], references: [id])
+  cliente            cli_clientes?           @relation(fields: [cliente_id], references: [id])
+  auditorias         seg_auditoria_acciones[]
+
+  @@index([rol_id])
+  @@map("seg_usuarios")
+}
+
+model cat_productos {
+  id           Int                @id @default(autoincrement())
+  sku          String             @unique @db.VarChar(40)
+  nombre       String             @db.VarChar(120)
+  descripcion  String?
+  categoria    String             @db.VarChar(80)
+  precio       Decimal            @db.Decimal(12, 2)
+  stock_minimo Int                @default(5)
+  activo       Boolean            @default(true)
+  created_at   DateTime           @default(now())
+  updated_at   DateTime           @updatedAt
+  inventario   inv_inventario?
+  carritoItems ord_carrito_items[]
+  ordenItems   ord_orden_items[]
+
+  @@index([nombre])
+  @@index([categoria])
+  @@map("cat_productos")
+}
+
+model inv_inventario {
+  id              Int           @id @default(autoincrement())
+  producto_id      Int           @unique
+  stock_actual     Int           @default(0)
+  stock_reservado  Int           @default(0)
+  stock_disponible Int           @default(0)
+  activo           Boolean       @default(true)
+  created_at       DateTime      @default(now())
+  updated_at       DateTime      @updatedAt
+  producto         cat_productos @relation(fields: [producto_id], references: [id])
+
+  @@index([producto_id])
+  @@map("inv_inventario")
+}
+
+model ord_carritos {
+  id         Int                @id @default(autoincrement())
+  cliente_id Int
+  estado     String             @default("ACTIVO") @db.VarChar(20)
+  activo     Boolean            @default(true)
+  created_at DateTime           @default(now())
+  updated_at DateTime           @updatedAt
+  cliente    cli_clientes       @relation(fields: [cliente_id], references: [id])
+  items      ord_carrito_items[]
+
+  @@index([cliente_id])
+  @@map("ord_carritos")
+}
+
+model ord_carrito_items {
+  id             Int          @id @default(autoincrement())
+  carrito_id     Int
+  producto_id    Int
+  cantidad       Int
+  precio_unitario Decimal     @db.Decimal(12, 2)
+  activo         Boolean      @default(true)
+  created_at     DateTime     @default(now())
+  updated_at     DateTime     @updatedAt
+  carrito        ord_carritos @relation(fields: [carrito_id], references: [id])
+  producto       cat_productos @relation(fields: [producto_id], references: [id])
+
+  @@unique([carrito_id, producto_id])
+  @@map("ord_carrito_items")
+}
+
+model ord_ordenes {
+  id           Int              @id @default(autoincrement())
+  cliente_id   Int
+  numero_orden String           @unique @db.VarChar(30)
+  subtotal     Decimal          @db.Decimal(12, 2)
+  impuestos    Decimal          @db.Decimal(12, 2)
+  total        Decimal          @db.Decimal(12, 2)
+  estado       String           @default("PENDIENTE") @db.VarChar(20)
+  metodo_pago  String           @db.VarChar(30)
+  activo       Boolean          @default(true)
+  created_at   DateTime         @default(now())
+  updated_at   DateTime         @updatedAt
+  cliente      cli_clientes     @relation(fields: [cliente_id], references: [id])
+  items        ord_orden_items[]
+
+  @@index([cliente_id])
+  @@index([estado])
+  @@map("ord_ordenes")
+}
+
+model ord_orden_items {
+  id             Int           @id @default(autoincrement())
+  orden_id       Int
+  producto_id    Int
+  cantidad       Int
+  precio_unitario Decimal      @db.Decimal(12, 2)
+  total_linea    Decimal       @db.Decimal(12, 2)
+  activo         Boolean       @default(true)
+  created_at     DateTime      @default(now())
+  updated_at     DateTime      @updatedAt
+  orden          ord_ordenes   @relation(fields: [orden_id], references: [id])
+  producto       cat_productos @relation(fields: [producto_id], references: [id])
+
+  @@map("ord_orden_items")
+}
+
+model seg_auditoria_acciones {
+  id         BigInt       @id @default(autoincrement())
+  usuario_id Int
+  modulo     String       @db.VarChar(50)
+  accion     String       @db.VarChar(50)
+  detalle    Json?
+  created_at DateTime     @default(now())
+  usuario    seg_usuarios @relation(fields: [usuario_id], references: [id])
+
+  @@index([usuario_id, created_at(sort: Desc)])
+  @@map("seg_auditoria_acciones")
+}

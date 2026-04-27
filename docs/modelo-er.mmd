@@ -1,0 +1,120 @@
+erDiagram
+    cli_clientes ||--o{ ord_ordenes : realiza
+    cli_clientes ||--o{ ord_carritos : tiene
+    ord_carritos ||--o{ ord_carrito_items : contiene
+    cat_productos ||--o{ ord_carrito_items : agregado
+    ord_ordenes ||--o{ ord_orden_items : detalla
+    cat_productos ||--o{ ord_orden_items : vendido
+    cat_productos ||--|| inv_inventario : controla
+    seg_roles ||--o{ seg_usuarios : asigna
+    seg_usuarios ||--o{ seg_auditoria_acciones : registra
+    cli_clientes ||--o| seg_usuarios : vinculado
+
+    cat_productos {
+        int id PK
+        varchar sku UK
+        varchar nombre
+        text descripcion
+        numeric precio
+        int stock_minimo
+        boolean activo
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    inv_inventario {
+        int id PK
+        int producto_id FK
+        int stock_actual
+        int stock_reservado
+        int stock_disponible
+        boolean activo
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    cli_clientes {
+        int id PK
+        varchar nombre
+        varchar apellido
+        varchar email UK
+        varchar telefono
+        boolean activo
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    ord_carritos {
+        int id PK
+        int cliente_id FK
+        varchar estado
+        boolean activo
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    ord_carrito_items {
+        int id PK
+        int carrito_id FK
+        int producto_id FK
+        int cantidad
+        numeric precio_unitario
+        boolean activo
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    ord_ordenes {
+        int id PK
+        int cliente_id FK
+        varchar numero_orden UK
+        numeric subtotal
+        numeric impuestos
+        numeric total
+        varchar estado
+        varchar metodo_pago
+        boolean activo
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    ord_orden_items {
+        int id PK
+        int orden_id FK
+        int producto_id FK
+        int cantidad
+        numeric precio_unitario
+        numeric total_linea
+        boolean activo
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    seg_roles {
+        int id PK
+        varchar nombre UK
+        varchar descripcion
+        boolean activo
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    seg_usuarios {
+        int id PK
+        int rol_id FK
+        int cliente_id FK
+        varchar email UK
+        varchar password_hash
+        boolean activo
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    seg_auditoria_acciones {
+        int id PK
+        int usuario_id FK
+        varchar modulo
+        varchar accion
+        json detalle
+        timestamp created_at
+    }
