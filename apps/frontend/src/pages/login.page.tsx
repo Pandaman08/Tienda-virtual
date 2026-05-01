@@ -2,6 +2,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import toast from "react-hot-toast";
+import { ClipboardCopy, LogIn, Pointer, Loader2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { apiClient } from "../services/api-client";
 import { useAuthStore } from "../stores/auth.store";
@@ -19,6 +20,7 @@ type LoginResponse = {
     refreshToken: string;
     usuario: {
       rol: "ADMIN" | "CLIENTE";
+      email: string;
     };
   };
 };
@@ -46,15 +48,28 @@ export const LoginPage = () => {
   });
 
   const onSubmit = form.handleSubmit(async (values) => {
-    const response = await apiClient.post<LoginResponse>("/auth/login", values);
-    const payload = response.data.data;
-    setSession({
-      accessToken: payload.accessToken,
-      refreshToken: payload.refreshToken,
-      rol: payload.usuario.rol
-    });
-    toast.success("¡Bienvenido de vuelta!", { icon: "👋" });
-    navigate(payload.usuario.rol === "ADMIN" ? "/admin" : "/");
+    try {
+      const response = await apiClient.post<LoginResponse>("/auth/login", values);
+      const payload = response.data.data;
+      setSession({
+        accessToken: payload.accessToken,
+        refreshToken: payload.refreshToken,
+        rol: payload.usuario.rol,
+        email: payload.usuario.email
+      });
+      toast.success("¡Bienvenido de vuelta!", { icon: "👋" });
+      navigate(payload.usuario.rol === "ADMIN" ? "/admin" : "/");
+    } catch (error) {
+      const message =
+        typeof error === "object" &&
+        error !== null &&
+        "response" in error &&
+        typeof (error as { response?: { data?: { message?: string } } }).response?.data?.message === "string"
+          ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
+          : "No se pudo iniciar sesion. Verifica que el backend este activo.";
+
+      toast.error(message || "Error de autenticacion");
+    }
   });
 
   const copyCredentials = async (email: string, password: string) => {
@@ -99,15 +114,17 @@ export const LoginPage = () => {
                       <button
                         type="button"
                         onClick={() => void copyCredentials(cred.email, cred.password)}
-                        className="text-xs font-semibold text-brand-700 hover:text-brand-800"
+                        className="text-xs font-semibold text-brand-700 hover:text-brand-800 inline-flex items-center gap-1"
                       >
+                        <ClipboardCopy className="w-3.5 h-3.5" />
                         Copiar
                       </button>
                       <button
                         type="button"
                         onClick={() => applyCredentials(cred.email, cred.password)}
-                        className="text-xs font-semibold text-gray-600 hover:text-gray-800"
+                        className="text-xs font-semibold text-gray-600 hover:text-gray-800 inline-flex items-center gap-1"
                       >
+                        <Pointer className="w-3.5 h-3.5" />
                         Usar
                       </button>
                     </div>
@@ -122,7 +139,7 @@ export const LoginPage = () => {
           <form onSubmit={onSubmit} className="space-y-5">
             {/* Email */}
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              <label htmlFor="login-email" className="block text-sm font-semibold text-gray-700 mb-1.5">
                 Correo electrónico
               </label>
               <div className="relative">
@@ -130,6 +147,7 @@ export const LoginPage = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                 </svg>
                 <input
+                  id="login-email"
                   {...form.register("email")}
                   type="email"
                   placeholder="tu@email.com"
@@ -143,7 +161,7 @@ export const LoginPage = () => {
 
             {/* Password */}
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              <label htmlFor="login-password" className="block text-sm font-semibold text-gray-700 mb-1.5">
                 Contraseña
               </label>
               <div className="relative">
@@ -151,6 +169,7 @@ export const LoginPage = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                 </svg>
                 <input
+                  id="login-password"
                   {...form.register("password")}
                   type="password"
                   placeholder="Mínimo 8 caracteres"
@@ -170,17 +189,12 @@ export const LoginPage = () => {
             >
               {isSubmitting ? (
                 <>
-                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
+                  <Loader2 className="w-4 h-4 animate-spin" />
                   Ingresando...
                 </>
               ) : (
                 <>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
-                  </svg>
+                  <LogIn className="w-4 h-4" />
                   Ingresar
                 </>
               )}

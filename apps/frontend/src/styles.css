@@ -13,6 +13,31 @@
   }
 }
 
+/* ── Scrollbar sutil ─────────────────────────────────────── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #9ca3af transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: #d1d5db;
+  border-radius: 999px;
+  transition: background-color 0.2s;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: #9ca3af;
+}
+
 @layer components {
   .btn-primary {
     @apply bg-brand-700 hover:bg-brand-800 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-200 cursor-pointer border-0;

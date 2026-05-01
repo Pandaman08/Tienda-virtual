@@ -4,5 +4,11 @@ import { usuariosController } from "./usuarios.controller";
 
 export const usuariosRoutes = Router();
 
-usuariosRoutes.use(authMiddleware, authorize("ADMIN"));
-usuariosRoutes.get("/", usuariosController.list);
+usuariosRoutes.use(authMiddleware);
+
+usuariosRoutes.get("/me", usuariosController.me);
+usuariosRoutes.patch("/me", usuariosController.updateMiPerfil);
+usuariosRoutes.patch("/me/password", usuariosController.updateMiPassword);
+
+usuariosRoutes.get("/", authorize("ADMIN"), usuariosController.list);
+usuariosRoutes.patch("/:id/credenciales", authorize("ADMIN"), usuariosController.updateCredencialesCliente);

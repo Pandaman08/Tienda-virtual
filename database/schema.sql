@@ -40,6 +40,7 @@ CREATE TABLE cat_productos (
     sku VARCHAR(40) UNIQUE NOT NULL,
     nombre VARCHAR(120) NOT NULL,
     descripcion TEXT,
+    imagen_url TEXT,
     categoria VARCHAR(80) NOT NULL,
     precio NUMERIC(12,2) NOT NULL CHECK (precio >= 0),
     stock_minimo INT NOT NULL DEFAULT 5 CHECK (stock_minimo >= 0),
@@ -89,6 +90,7 @@ CREATE TABLE ord_ordenes (
     total NUMERIC(12,2) NOT NULL CHECK (total >= 0),
     estado VARCHAR(20) NOT NULL DEFAULT 'PENDIENTE',
     metodo_pago VARCHAR(30) NOT NULL,
+    transaccion_id VARCHAR(80),
     activo BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW()
@@ -163,10 +165,39 @@ INSERT INTO cat_productos (sku, nombre, descripcion, categoria, precio, stock_mi
 INSERT INTO inv_inventario (producto_id, stock_actual, stock_reservado, stock_disponible)
 SELECT id, 25, 2, 23 FROM cat_productos;
 
+UPDATE inv_inventario i
+SET stock_actual = x.stock_actual,
+    stock_reservado = x.stock_reservado,
+    stock_disponible = x.stock_disponible,
+    updated_at = NOW()
+FROM (
+    VALUES
+        ('SKU-001', 2, 0, 2),
+        ('SKU-004', 4, 1, 3),
+        ('SKU-009', 2, 0, 2),
+        ('SKU-015', 1, 0, 1),
+        ('SKU-017', 7, 2, 5),
+        ('SKU-020', 0, 0, 0)
+) AS x(sku, stock_actual, stock_reservado, stock_disponible)
+JOIN cat_productos p ON p.sku = x.sku
+WHERE i.producto_id = p.id;
+
 INSERT INTO ord_ordenes (cliente_id, numero_orden, subtotal, impuestos, total, estado, metodo_pago, activo, created_at, updated_at) VALUES
 ((SELECT id FROM cli_clientes WHERE email = 'ana@example.com'), 'ORD-0001', 5600.00, 1008.00, 6608.00, 'PAGADA', 'TARJETA', TRUE, NOW() - INTERVAL '20 days', NOW() - INTERVAL '20 days'),
 ((SELECT id FROM cli_clientes WHERE email = 'luis@example.com'), 'ORD-0002', 980.00, 176.40, 1156.40, 'PAGADA', 'YAPE', TRUE, NOW() - INTERVAL '10 days', NOW() - INTERVAL '10 days'),
 ((SELECT id FROM cli_clientes WHERE email = 'marta@example.com'), 'ORD-0003', 3300.00, 594.00, 3894.00, 'PAGADA', 'TARJETA', TRUE, NOW() - INTERVAL '3 days', NOW() - INTERVAL '3 days')
+ON CONFLICT (numero_orden) DO NOTHING;
+
+INSERT INTO ord_ordenes (cliente_id, numero_orden, subtotal, impuestos, total, estado, metodo_pago, transaccion_id, activo, created_at, updated_at) VALUES
+((SELECT id FROM cli_clientes WHERE email = 'ana@example.com'), 'ORD-0004', 2100.00, 378.00, 2478.00, 'PAGADA', 'TARJETA', 'TXN-0004', TRUE, NOW() - INTERVAL '7 days', NOW() - INTERVAL '7 days'),
+((SELECT id FROM cli_clientes WHERE email = 'luis@example.com'), 'ORD-0005', 760.00, 136.80, 896.80, 'PAGADA', 'YAPE', 'TXN-0005', TRUE, NOW() - INTERVAL '6 days', NOW() - INTERVAL '6 days'),
+((SELECT id FROM cli_clientes WHERE email = 'marta@example.com'), 'ORD-0006', 430.00, 77.40, 507.40, 'PAGADA', 'TARJETA', 'TXN-0006', TRUE, NOW() - INTERVAL '5 days', NOW() - INTERVAL '5 days'),
+((SELECT id FROM cli_clientes WHERE email = 'ana@example.com'), 'ORD-0007', 1450.00, 261.00, 1711.00, 'PAGADA', 'PLIN', 'TXN-0007', TRUE, NOW() - INTERVAL '4 days', NOW() - INTERVAL '4 days'),
+((SELECT id FROM cli_clientes WHERE email = 'luis@example.com'), 'ORD-0008', 290.00, 52.20, 342.20, 'PAGADA', 'YAPE', 'TXN-0008', TRUE, NOW() - INTERVAL '2 days', NOW() - INTERVAL '2 days'),
+((SELECT id FROM cli_clientes WHERE email = 'marta@example.com'), 'ORD-0009', 640.00, 115.20, 755.20, 'PAGADA', 'TARJETA', 'TXN-0009', TRUE, NOW() - INTERVAL '1 days', NOW() - INTERVAL '1 days'),
+((SELECT id FROM cli_clientes WHERE email = 'ana@example.com'), 'ORD-0010', 350.00, 63.00, 413.00, 'PAGADA', 'YAPE', 'TXN-0010', TRUE, NOW(), NOW()),
+((SELECT id FROM cli_clientes WHERE email = 'luis@example.com'), 'ORD-0011', 120.00, 21.60, 141.60, 'PAGADA', 'PLIN', 'TXN-0011', TRUE, NOW(), NOW()),
+((SELECT id FROM cli_clientes WHERE email = 'marta@example.com'), 'ORD-0012', 980.00, 176.40, 1156.40, 'PAGADA', 'TARJETA', 'TXN-0012', TRUE, NOW(), NOW())
 ON CONFLICT (numero_orden) DO NOTHING;
 
 INSERT INTO ord_orden_items (orden_id, producto_id, cantidad, precio_unitario, total_linea, activo, created_at, updated_at)

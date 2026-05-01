@@ -11,9 +11,9 @@ const addItemSchema = z.object({
 
 export const carritoController = {
   getMine: async (req: Request, res: Response) => {
-    const clienteId = req.user?.sub;
+    const clienteId = req.user?.clienteId;
     if (!clienteId) {
-      throw new Error("Usuario no autenticado");
+      throw new Error("Usuario no autenticado o sin perfil de cliente");
     }
 
     const data = await carritoService.getMine(clienteId);
@@ -21,9 +21,9 @@ export const carritoController = {
   },
 
   addItem: async (req: Request, res: Response) => {
-    const clienteId = req.user?.sub;
+    const clienteId = req.user?.clienteId;
     if (!clienteId) {
-      throw new Error("Usuario no autenticado");
+      throw new Error("Usuario no autenticado o sin perfil de cliente");
     }
 
     const input = addItemSchema.parse(req.body);
@@ -38,9 +38,9 @@ export const carritoController = {
   },
 
   clear: async (req: Request, res: Response) => {
-    const clienteId = req.user?.sub;
+    const clienteId = req.user?.clienteId;
     if (!clienteId) {
-      throw new Error("Usuario no autenticado");
+      throw new Error("Usuario no autenticado o sin perfil de cliente");
     }
 
     const data = await carritoService.clear(clienteId);

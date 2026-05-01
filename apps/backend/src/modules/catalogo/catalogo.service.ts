@@ -1,11 +1,11 @@
 import { catalogoRepository } from "./catalogo.repository";
 
 export const catalogoService = {
-  list: async (params: { page: number; limit: number; q?: string; categoria?: string }) => {
+  list: async (params: { page: number; limit: number; q?: string; categoria?: string; incluirInactivos?: boolean }) => {
     const skip = (params.page - 1) * params.limit;
     const [items, total] = await Promise.all([
-      catalogoRepository.findMany(skip, params.limit, params.q, params.categoria),
-      catalogoRepository.count(params.q, params.categoria)
+      catalogoRepository.findMany(skip, params.limit, params.q, params.categoria, Boolean(params.incluirInactivos)),
+      catalogoRepository.count(params.q, params.categoria, Boolean(params.incluirInactivos))
     ]);
 
     return {
@@ -21,5 +21,6 @@ export const catalogoService = {
 
   create: catalogoRepository.create,
   update: catalogoRepository.update,
-  remove: catalogoRepository.softDelete
+  remove: catalogoRepository.softDelete,
+  setActivo: catalogoRepository.setActivo
 };

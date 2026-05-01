@@ -26,8 +26,8 @@ export const authController = {
       throw new Error("Refresh token invalido");
     }
 
-    const payload = raw as { sub: number; rol: "ADMIN" | "CLIENTE" };
-    const data = await authService.refresh(payload.sub, token, payload.rol);
+    const payload = raw as { sub: number; rol: "ADMIN" | "CLIENTE"; clienteId?: number | null };
+    const data = await authService.refresh(payload.sub, token, payload.rol, payload.clienteId ?? undefined);
     res.status(StatusCodes.OK).json(ok("Token actualizado", data));
   }
 };

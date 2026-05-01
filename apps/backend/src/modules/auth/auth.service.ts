@@ -3,9 +3,9 @@ import jwt from "jsonwebtoken";
 import { env } from "../../config/env";
 import { authRepository } from "./auth.repository";
 
-const createTokens = (userId: number, rol: "ADMIN" | "CLIENTE") => {
-  const accessToken = jwt.sign({ sub: userId, rol }, env.JWT_ACCESS_SECRET, { expiresIn: "15m" });
-  const refreshToken = jwt.sign({ sub: userId, rol }, env.JWT_REFRESH_SECRET, { expiresIn: "7d" });
+const createTokens = (userId: number, rol: "ADMIN" | "CLIENTE", clienteId?: number) => {
+  const accessToken = jwt.sign({ sub: userId, rol, clienteId: clienteId ?? null }, env.JWT_ACCESS_SECRET, { expiresIn: "15m" });
+  const refreshToken = jwt.sign({ sub: userId, rol, clienteId: clienteId ?? null }, env.JWT_REFRESH_SECRET, { expiresIn: "7d" });
   return { accessToken, refreshToken };
 };
 
@@ -25,7 +25,7 @@ export const authService = {
     const passwordHash = await bcrypt.hash(input.password, 10);
     const result = await authRepository.createClienteYUsuario({ ...input, passwordHash });
     const rol = result.usuario.rol.nombre as "ADMIN" | "CLIENTE";
-    const tokens = createTokens(result.usuario.id, rol);
+    const tokens = createTokens(result.usuario.id, rol, result.cliente.id);
 
     await authRepository.updateRefreshTokenHash(result.usuario.id, await bcrypt.hash(tokens.refreshToken, 10));
 
@@ -51,7 +51,8 @@ export const authService = {
     }
 
     const rol = user.rol.nombre as "ADMIN" | "CLIENTE";
-    const tokens = createTokens(user.id, rol);
+    const clienteId = user.cliente_id ?? undefined;
+    const tokens = createTokens(user.id, rol, clienteId);
     await authRepository.updateRefreshTokenHash(user.id, await bcrypt.hash(tokens.refreshToken, 10));
 
     return {
@@ -64,12 +65,12 @@ export const authService = {
     };
   },
 
-  refresh: async (userId: number, refreshToken: string, rol: "ADMIN" | "CLIENTE") => {
+  refresh: async (userId: number, refreshToken: string, rol: "ADMIN" | "CLIENTE", clienteId?: number) => {
     if (!refreshToken) {
       throw new Error("Refresh token requerido");
     }
 
-    const tokens = createTokens(userId, rol);
+    const tokens = createTokens(userId, rol, clienteId);
     return tokens;
   }
 };

@@ -4,6 +4,7 @@ type Producto = {
   categoria: string;
   precio: number;
   descripcion?: string;
+  imagen_url?: string | null;
 };
 
 type Props = {
@@ -35,7 +36,11 @@ export const ProductCard = ({ producto, onAddToCart }: Props) => {
     <article className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 flex flex-col overflow-hidden group">
       {/* Imagen / Placeholder */}
       <div className={`relative bg-gradient-to-br ${gradientClass} h-44 flex items-center justify-center`}>
-        <span className="text-white text-4xl font-bold opacity-30 select-none">{initials}</span>
+        {producto.imagen_url ? (
+          <img src={producto.imagen_url} alt={producto.nombre} className="w-full h-full object-cover" />
+        ) : (
+          <span className="text-white text-4xl font-bold opacity-30 select-none">{initials}</span>
+        )}
         {/* Badge */}
         {badge && (
           <span className={`absolute top-3 left-3 text-xs font-bold px-2 py-1 rounded-full ${badge.color}`}>

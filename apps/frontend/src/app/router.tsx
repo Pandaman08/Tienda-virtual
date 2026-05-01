@@ -8,10 +8,14 @@ import { AdminPage } from "../pages/admin.page";
 import { CarritoPage } from "../pages/carrito.page";
 import { LoginPage } from "../pages/login.page";
 import { TiendaPage } from "../pages/tienda.page";
+import { PerfilPage } from "../pages/perfil.page";
+import { ConfiguracionPage } from "../pages/configuracion.page";
 
 export const AppRouter = () => {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const location = useLocation();
+  const hideShell = location.pathname.startsWith("/admin") || location.pathname.startsWith("/login");
+  const hideDrawer = hideShell || location.pathname.startsWith("/carrito");
 
   useEffect(() => {
     setIsCartOpen(false);
@@ -19,15 +23,31 @@ export const AppRouter = () => {
 
   return (
     <div className="flex flex-col min-h-screen">
-      <NavBar onCartClick={() => setIsCartOpen(true)} />
+      {!hideShell && <NavBar onCartClick={() => setIsCartOpen(true)} />}
       <main className="flex-1">
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/" element={<TiendaPage />} />
           <Route
+            path="/perfil"
+            element={
+              <ProtectedRoute roles={["CLIENTE", "ADMIN"]}>
+                <PerfilPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/configuracion"
+            element={
+              <ProtectedRoute roles={["CLIENTE", "ADMIN"]}>
+                <ConfiguracionPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/carrito"
             element={
-              <ProtectedRoute roles={["CLIENTE"]}>
+              <ProtectedRoute roles={["CLIENTE", "ADMIN"]}>
                 <CarritoPage />
               </ProtectedRoute>
             }
@@ -43,8 +63,8 @@ export const AppRouter = () => {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
-      <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
-      <Footer />
+      {!hideDrawer && <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />}
+      {!hideShell && <Footer />}
     </div>
   );
 };

@@ -6,6 +6,7 @@ import { env } from "../../config/env";
 type JwtPayload = {
   sub: number;
   rol: "ADMIN" | "CLIENTE";
+  clienteId: number | null;
 };
 
 declare global {

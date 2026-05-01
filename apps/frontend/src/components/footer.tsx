@@ -1,8 +1,10 @@
 import { Link } from "react-router-dom";
 import { useAuthStore } from "../stores/auth.store";
+import { useStoreConfig } from "../stores/store-config.store";
 
 export const Footer = () => {
   const { rol } = useAuthStore();
+  const storeConfig = useStoreConfig();
 
   return (
     <footer className="bg-gray-800 text-gray-300 mt-auto">
@@ -11,10 +13,16 @@ export const Footer = () => {
         {/* Marca */}
         <div>
           <div className="flex items-center gap-2 mb-3">
-            <div className="w-7 h-7 bg-brand-600 rounded-lg flex items-center justify-center">
-              <span className="text-white text-xs font-bold">TV</span>
+            <div className="w-7 h-7 rounded-lg overflow-hidden flex items-center justify-center bg-brand-600 flex-shrink-0">
+              {storeConfig.logo ? (
+                <img src={storeConfig.logo} alt={storeConfig.nombre} className="w-full h-full object-contain" />
+              ) : (
+                <span className="text-white text-xs font-bold">
+                  {storeConfig.nombre.slice(0, 2).toUpperCase()}
+                </span>
+              )}
             </div>
-            <span className="text-white font-bold">TiendaVirtual</span>
+            <span className="text-white font-bold truncate">{storeConfig.nombre}</span>
           </div>
           <p className="text-sm text-gray-400 leading-relaxed">
             Tu tienda online de confianza. Productos de calidad con los mejores precios y envío rápido.
@@ -59,7 +67,7 @@ export const Footer = () => {
       </div>
 
       <div className="border-t border-gray-700 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-500">
-        <span>© {new Date().getFullYear()} TiendaVirtual. Todos los derechos reservados.</span>
+        <span>© {new Date().getFullYear()} {storeConfig.nombre}. Todos los derechos reservados.</span>
         <div className="flex items-center gap-4">
           <span className="flex items-center gap-1">
             <svg className="w-3.5 h-3.5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
