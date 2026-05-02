@@ -111,7 +111,7 @@ export const reportesService = {
   generarOperacional: async (empresa = "Tienda Virtual"): Promise<Buffer> => {
     const [resumen, topProductos, stockItems] = await Promise.all([
       reportesRepository.ventasResumen(),
-      reportesRepository.topProductos("todo", 8),
+      reportesRepository.topProductos("todo", 10),
       prisma.inv_inventario.findMany({
         where: { activo: true },
         include: { producto: { select: { nombre: true, categoria: true, stock_minimo: true } } },
@@ -119,116 +119,214 @@ export const reportesService = {
       })
     ]);
 
+    const totalItems = stockItems.length || 1;
     const agotados  = stockItems.filter((i) => i.stock_disponible === 0).length;
     const criticos  = stockItems.filter((i) => i.stock_disponible > 0 && i.stock_disponible <= i.producto.stock_minimo).length;
     const normales  = stockItems.filter((i) => i.stock_disponible > i.producto.stock_minimo).length;
+    const pctAgotado = Math.round((agotados / totalItems) * 100);
+    const pctCritico = Math.round((criticos / totalItems) * 100);
+    const pctNormal  = Math.round((normales / totalItems) * 100);
+
+    // Donut SVG de estado de inventario
+    const donutTotal = agotados + criticos + normales || 1;
+    const angAgotado = (agotados / donutTotal) * 360;
+    const angCritico = (criticos / donutTotal) * 360;
+    const polarToCart = (deg: number, r: number) => {
+      const rad = ((deg - 90) * Math.PI) / 180;
+      return { x: 60 + r * Math.cos(rad), y: 60 + r * Math.sin(rad) };
+    };
+    const donutArc = (startDeg: number, sweepDeg: number, color: string) => {
+      if (sweepDeg <= 0) return "";
+      if (sweepDeg >= 360) sweepDeg = 359.99;
+      const p1 = polarToCart(startDeg, 44);
+      const p2 = polarToCart(startDeg + sweepDeg, 44);
+      const p3 = polarToCart(startDeg + sweepDeg, 28);
+      const p4 = polarToCart(startDeg, 28);
+      const lg = sweepDeg > 180 ? 1 : 0;
+      return `<path d="M${p1.x},${p1.y} A44,44 0 ${lg},1 ${p2.x},${p2.y} L${p3.x},${p3.y} A28,28 0 ${lg},0 ${p4.x},${p4.y} Z" fill="${color}"/>`;
+    };
+    const donutSvg = `<svg width="120" height="120" viewBox="0 0 120 120">
+      ${donutArc(0, angAgotado, "#dc2626")}
+      ${donutArc(angAgotado, angCritico, "#f97316")}
+      ${donutArc(angAgotado + angCritico, 360 - angAgotado - angCritico, "#22c55e")}
+      <circle cx="60" cy="60" r="22" fill="#fff"/>
+      <text x="60" y="55" text-anchor="middle" font-size="11" font-weight="700" fill="#0f172a" font-family="Arial">${totalItems}</text>
+      <text x="60" y="68" text-anchor="middle" font-size="8" fill="#64748b" font-family="Arial">items</text>
+    </svg>`;
 
     const stockRows = stockItems.map((item) => {
       const disp = item.stock_disponible;
       const min  = item.producto.stock_minimo;
       const agotado = disp === 0;
       const critico = !agotado && disp <= min;
+      const maxBar  = Math.max(disp, min, 1);
+      const barPct  = Math.min(Math.round((disp / maxBar) * 100), 100);
+      const barColor = agotado ? "#dc2626" : critico ? "#f97316" : "#22c55e";
 
-      let badge: string;
-      if (agotado) {
-        badge = `<span style="background:#fee2e2;color:#dc2626;padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700;white-space:nowrap">AGOTADO</span>`;
-      } else if (critico) {
-        badge = `<span style="background:#fff7ed;color:#ea580c;padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700;white-space:nowrap">CRITICO</span>`;
-      } else {
-        badge = `<span style="background:#f0fdf4;color:#16a34a;padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700;white-space:nowrap">NORMAL</span>`;
-      }
+      const badge = agotado
+        ? `<span style="background:#fee2e2;color:#dc2626;padding:2px 8px;border-radius:20px;font-size:9px;font-weight:700;letter-spacing:.04em">&#9679; AGOTADO</span>`
+        : critico
+        ? `<span style="background:#fff7ed;color:#ea580c;padding:2px 8px;border-radius:20px;font-size:9px;font-weight:700;letter-spacing:.04em">&#9650; CRITICO</span>`
+        : `<span style="background:#f0fdf4;color:#16a34a;padding:2px 8px;border-radius:20px;font-size:9px;font-weight:700;letter-spacing:.04em">&#10003; NORMAL</span>`;
 
-      let rowBg: string;
-      if (agotado) { rowBg = "background:#fff5f5"; }
-      else if (critico) { rowBg = "background:#fffbf5"; }
-      else { rowBg = ""; }
+      const rowBg = agotado ? "#fff8f8" : critico ? "#fffaf5" : "";
 
-      let dispColor: string;
-      if (agotado) { dispColor = "#dc2626"; }
-      else if (critico) { dispColor = "#ea580c"; }
-      else { dispColor = "#0f172a"; }
-
-      return `<tr style="${rowBg}">
-        <td style="padding:7px 10px;font-size:12px">${item.producto.nombre}</td>
-        <td style="padding:7px 10px;font-size:11px;color:#64748b">${item.producto.categoria}</td>
-        <td style="padding:7px 10px;font-size:12px;text-align:right;font-weight:700;color:${dispColor}">${disp}</td>
-        <td style="padding:7px 10px;font-size:12px;text-align:right;color:#94a3b8">${min}</td>
-        <td style="padding:7px 10px;text-align:center">${badge}</td>
+      return `<tr style="background:${rowBg}">
+        <td style="padding:6px 10px;font-size:11px;font-weight:600">${item.producto.nombre}</td>
+        <td style="padding:6px 10px;font-size:10px;color:#64748b">${item.producto.categoria}</td>
+        <td style="padding:6px 10px;width:90px">
+          <div style="background:#e2e8f0;border-radius:4px;height:7px;overflow:hidden">
+            <div style="background:${barColor};height:7px;width:${barPct}%;border-radius:4px"></div>
+          </div>
+          <div style="font-size:9px;color:#64748b;margin-top:2px">${disp} / min ${min}</div>
+        </td>
+        <td style="padding:6px 10px;text-align:center">${badge}</td>
       </tr>`;
     }).join("");
 
-    const topRows = topProductos.map((p) =>
-      `<tr>
-        <td style="padding:7px 10px;font-size:12px">${p.nombre}</td>
-        <td style="padding:7px 10px;font-size:11px;color:#64748b">${p.categoria}</td>
-        <td style="padding:7px 10px;font-size:12px;text-align:right;font-weight:700">${p.unidades}</td>
-        <td style="padding:7px 10px;font-size:12px;text-align:right">${formatMoney(p.ingresos)}</td>
-      </tr>`
-    ).join("");
+    // Barras horizontales SVG para top productos
+    const maxIngresos = Math.max(...topProductos.map((p) => p.ingresos), 1);
+    const topBarColors = ["#6366f1","#8b5cf6","#3b82f6","#0891b2","#10b981","#f59e0b","#ef4444","#ec4899","#14b8a6","#f97316"];
+    const topProdSvgH = topProductos.length * 34 + 4;
+    const topProdBars = topProductos.map((p, i) => {
+      const bw = Math.max(Math.round((p.ingresos / maxIngresos) * 230), 4);
+      const y  = i * 34;
+      const label = p.nombre.length > 20 ? p.nombre.substring(0, 20) + "…" : p.nombre;
+      const color = topBarColors[i % topBarColors.length];
+      return `<g transform="translate(0,${y})">
+        <text x="0" y="13" font-size="10" fill="#334155" font-family="Arial">${i + 1}. ${label}</text>
+        <rect x="0" y="17" width="${bw}" height="11" fill="${color}" rx="3" opacity="0.85"/>
+        <rect x="0" y="17" width="4" height="11" fill="${color}" rx="2"/>
+        <text x="${bw + 5}" y="27" font-size="9" fill="#64748b" font-family="Arial">${formatMoney(p.ingresos)}</text>
+      </g>`;
+    }).join("");
 
     const html = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"/>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Segoe UI',Arial,sans-serif;color:#0f172a;background:#f8fafc}
-.header{background:linear-gradient(135deg,#0369a1 0%,#0ea5e9 100%);color:#fff;padding:28px 36px}
-.header h1{font-size:26px;font-weight:700;margin-bottom:4px}
-.header p{color:#bae6fd;font-size:12px}
-.header .badge{display:inline-block;background:rgba(255,255,255,.18);color:#e0f2fe;font-size:11px;font-weight:600;border-radius:6px;padding:2px 10px;margin-bottom:8px}
-.body{padding:20px 32px 28px}
-.kpi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px}
-.kpi{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px}
-.kpi-label{color:#64748b;font-size:11px;margin-bottom:6px}
-.kpi-value{font-size:21px;font-weight:700}
-.alert-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px}
-.alert{border-radius:10px;padding:14px;text-align:center}
-.a-red{background:#fee2e2;border:1px solid #fca5a5}.a-red .n{color:#dc2626}.a-red .l{color:#b91c1c}
-.a-ora{background:#fff7ed;border:1px solid #fdba74}.a-ora .n{color:#ea580c}.a-ora .l{color:#c2410c}
-.a-grn{background:#f0fdf4;border:1px solid #86efac}.a-grn .n{color:#16a34a}.a-grn .l{color:#15803d}
-.n{font-size:28px;font-weight:800}.l{font-size:11px;margin-top:3px;font-weight:600}
-.section{background:#fff;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:14px;overflow:hidden}
-.sh{background:#f8fafc;padding:10px 16px;border-bottom:1px solid #e2e8f0;font-size:13px;font-weight:700}
+body{font-family:'Segoe UI',Arial,sans-serif;color:#0f172a;background:#f1f5f9;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.header{background:linear-gradient(135deg,#0c4a6e 0%,#0369a1 60%,#0284c7 100%);color:#fff;padding:26px 36px 22px;position:relative;overflow:hidden}
+.header::after{content:'';position:absolute;right:-40px;top:-40px;width:180px;height:180px;border-radius:50%;background:rgba(255,255,255,.07)}
+.header::before{content:'';position:absolute;right:80px;bottom:-30px;width:100px;height:100px;border-radius:50%;background:rgba(255,255,255,.05)}
+.header-top{display:flex;justify-content:space-between;align-items:flex-start}
+.header-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.18);color:#e0f2fe;font-size:10px;font-weight:700;border-radius:20px;padding:3px 12px;margin-bottom:8px;letter-spacing:.06em}
+.header h1{font-size:26px;font-weight:800;margin-bottom:4px;letter-spacing:-.3px}
+.header p{color:#bae6fd;font-size:11px}
+.header-meta{background:rgba(255,255,255,.12);border-radius:10px;padding:8px 14px;font-size:11px;text-align:right;min-width:140px}
+.header-meta .val{font-size:18px;font-weight:800;display:block}
+.body{padding:18px 28px 24px}
+.kpi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.kpi{background:#fff;border-radius:12px;padding:14px 16px;border-left:4px solid var(--c);box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.kpi-icon{font-size:18px;margin-bottom:6px}
+.kpi-label{color:#64748b;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+.kpi-value{font-size:20px;font-weight:800;color:var(--c);line-height:1}
+.kpi-sub{font-size:9px;color:#94a3b8;margin-top:3px}
+.semaforo-row{display:grid;grid-template-columns:auto 1fr;gap:16px;background:#fff;border-radius:12px;padding:16px;margin-bottom:14px;box-shadow:0 1px 4px rgba(0,0,0,.06);align-items:center}
+.semaforo-legend{display:flex;flex-direction:column;gap:8px;flex:1}
+.leg-item{display:flex;align-items:center;gap:8px;font-size:11px}
+.leg-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+.leg-bar-wrap{flex:1;background:#e2e8f0;border-radius:4px;height:8px;overflow:hidden}
+.leg-bar{height:8px;border-radius:4px}
+.leg-pct{font-weight:700;font-size:11px;min-width:36px;text-align:right}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.section{background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.sh{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:2px solid #f1f5f9;font-size:12px;font-weight:700}
+.sh-dot{width:8px;height:8px;border-radius:50%}
 table{width:100%;border-collapse:collapse}
-thead th{background:#f1f5f9;color:#475569;text-align:left;font-size:10px;padding:8px 10px;text-transform:uppercase;letter-spacing:.04em}
-tbody tr:nth-child(even):not([style]){background:#f8fafc}
-td{border-top:1px solid #f1f5f9}
-.foot{font-size:10px;text-align:center;color:#94a3b8;margin-top:14px;padding-top:10px;border-top:1px solid #e2e8f0}
+thead th{background:#f8fafc;color:#475569;text-align:left;font-size:9px;padding:7px 10px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #e2e8f0}
+tbody tr:hover{background:#f8fafc}
+td{border-top:1px solid #f8fafc;vertical-align:middle}
+.foot{font-size:9px;text-align:center;color:#94a3b8;margin-top:12px;padding-top:8px;border-top:1px solid #e2e8f0;display:flex;justify-content:center;gap:16px}
+.foot span{display:inline-flex;align-items:center;gap:4px}
 </style>
 </head><body>
 <div class="header">
-  <div class="badge">INFORME OPERACIONAL</div>
-  <h1>Informe Operacional</h1>
-  <p>Generado el ${formatDate()} &nbsp;&middot;&nbsp; Detalle operativo de ventas, stock critico y metricas del negocio</p>
+  <div class="header-top">
+    <div>
+      <div class="header-badge">&#9654; INFORME OPERACIONAL</div>
+      <h1>Informe Operacional</h1>
+      <p>Detalle operativo de ventas, stock critico y metricas del negocio</p>
+    </div>
+    <div class="header-meta">
+      <span style="color:#bae6fd;font-size:9px;text-transform:uppercase;letter-spacing:.06em">Ordenes totales</span>
+      <span class="val">${resumen.totalOrdenes}</span>
+      <span style="color:#7dd3fc;font-size:10px">${formatMoney(resumen.ventasTotales)}</span>
+    </div>
+  </div>
 </div>
 <div class="body">
   <div class="kpi-grid">
-    <div class="kpi"><div class="kpi-label">Total Ordenes</div><div class="kpi-value">${resumen.totalOrdenes}</div></div>
-    <div class="kpi"><div class="kpi-label">Ventas Totales</div><div class="kpi-value">${formatMoney(resumen.ventasTotales)}</div></div>
-    <div class="kpi"><div class="kpi-label">Ticket Promedio</div><div class="kpi-value">${formatMoney(resumen.ticketPromedio)}</div></div>
+    <div class="kpi" style="--c:#2563eb">
+      <div class="kpi-label">Total Ordenes</div>
+      <div class="kpi-value">${resumen.totalOrdenes}</div>
+      <div class="kpi-sub">ordenes procesadas</div>
+    </div>
+    <div class="kpi" style="--c:#059669">
+      <div class="kpi-label">Ventas Totales</div>
+      <div class="kpi-value">${formatMoney(resumen.ventasTotales)}</div>
+      <div class="kpi-sub">ingresos acumulados</div>
+    </div>
+    <div class="kpi" style="--c:#7c3aed">
+      <div class="kpi-label">Ticket Promedio</div>
+      <div class="kpi-value">${formatMoney(resumen.ticketPromedio)}</div>
+      <div class="kpi-sub">por orden</div>
+    </div>
   </div>
-  <div class="alert-grid">
-    <div class="alert a-red"><div class="n">${agotados}</div><div class="l">Productos Agotados</div></div>
-    <div class="alert a-ora"><div class="n">${criticos}</div><div class="l">Stock Critico</div></div>
-    <div class="alert a-grn"><div class="n">${normales}</div><div class="l">Stock Normal</div></div>
+
+  <div class="semaforo-row">
+    ${donutSvg}
+    <div class="semaforo-legend">
+      <div style="font-size:11px;font-weight:700;color:#0f172a;margin-bottom:4px">Estado del Inventario — ${totalItems} productos activos</div>
+      <div class="leg-item">
+        <div class="leg-dot" style="background:#dc2626"></div>
+        <span style="width:80px;color:#dc2626;font-weight:600">Agotados (${agotados})</span>
+        <div class="leg-bar-wrap"><div class="leg-bar" style="background:#dc2626;width:${pctAgotado}%"></div></div>
+        <span class="leg-pct" style="color:#dc2626">${pctAgotado}%</span>
+      </div>
+      <div class="leg-item">
+        <div class="leg-dot" style="background:#f97316"></div>
+        <span style="width:80px;color:#ea580c;font-weight:600">Criticos (${criticos})</span>
+        <div class="leg-bar-wrap"><div class="leg-bar" style="background:#f97316;width:${pctCritico}%"></div></div>
+        <span class="leg-pct" style="color:#f97316">${pctCritico}%</span>
+      </div>
+      <div class="leg-item">
+        <div class="leg-dot" style="background:#22c55e"></div>
+        <span style="width:80px;color:#16a34a;font-weight:600">Normales (${normales})</span>
+        <div class="leg-bar-wrap"><div class="leg-bar" style="background:#22c55e;width:${pctNormal}%"></div></div>
+        <span class="leg-pct" style="color:#16a34a">${pctNormal}%</span>
+      </div>
+    </div>
   </div>
-  <div class="section">
-    <div class="sh">Estado del Inventario</div>
-    <table><thead><tr><th>Producto</th><th>Categoria</th><th style="text-align:right">Disponible</th><th style="text-align:right">Minimo</th><th style="text-align:center">Estado</th></tr></thead>
-    <tbody>${stockRows}</tbody></table>
+
+  <div class="two-col">
+    <div class="section">
+      <div class="sh"><div class="sh-dot" style="background:#dc2626"></div>Inventario por Estado</div>
+      <table>
+        <thead><tr><th>Producto</th><th>Categoria</th><th>Stock</th><th>Estado</th></tr></thead>
+        <tbody>${stockRows}</tbody>
+      </table>
+    </div>
+    <div class="section">
+      <div class="sh"><div class="sh-dot" style="background:#6366f1"></div>Top Productos — Ingresos</div>
+      <div style="padding:12px 14px">
+        <svg width="100%" height="${topProdSvgH}" viewBox="0 0 310 ${topProdSvgH}" preserveAspectRatio="xMinYMin meet">${topProdBars}</svg>
+      </div>
+    </div>
   </div>
-  <div class="section">
-    <div class="sh">Top Productos por Ventas</div>
-    <table><thead><tr><th>Producto</th><th>Categoria</th><th style="text-align:right">Unidades</th><th style="text-align:right">Ingresos</th></tr></thead>
-    <tbody>${topRows}</tbody></table>
+
+  <div class="foot">
+    <span>&#128197; Generado el ${formatDate()}</span>
+    <span>&#127970; ${empresa}</span>
+    <span>&#128274; Informe Operacional — uso interno</span>
   </div>
-  <div class="foot">${empresa} &nbsp;|&nbsp; Informe Operacional &mdash; uso interno</div>
 </div>
 </body></html>`;
 
     try {
       const browser = await puppeteer.launch({ headless: true, args: ["--no-sandbox", "--disable-setuid-sandbox"] });
       const page = await browser.newPage();
-      await page.setContent(html);
+      await page.setContent(html, { waitUntil: "networkidle0" });
       const pdf = await page.pdf({ format: "A4", printBackground: true, margin: { top: "0", right: "0", bottom: "0", left: "0" } });
       await browser.close();
       return Buffer.from(pdf);
@@ -245,116 +343,228 @@ td{border-top:1px solid #f1f5f9}
   generarGestion: async (empresa = "Tienda Virtual"): Promise<Buffer> => {
     const [resumen, topProductos, ventasPorCategoria] = await Promise.all([
       reportesRepository.ventasResumen(),
-      reportesRepository.topProductos("todo", 6),
+      reportesRepository.topProductos("todo", 7),
       reportesRepository.ventasPorCategoria("todo")
     ]);
 
-    // SVG chart — top productos (barras horizontales)
-    const barColors = ["#4F46E5","#7C3AED","#2563EB","#0891B2","#059669","#D97706"];
-    const maxUnits = Math.max(...topProductos.map((p) => p.unidades), 1);
-    const prodSvgH = topProductos.length * 38 + 8;
-    const prodBars = topProductos.map((p, i) => {
-      const bw = Math.max(Math.round((p.unidades / maxUnits) * 260), 4);
-      const y = i * 38;
-      const label = p.nombre.length > 22 ? p.nombre.substring(0, 22) + "…" : p.nombre;
+    // ── Paletas ──────────────────────────────────────────────────
+    const paletaProd = ["#6366f1","#8b5cf6","#3b82f6","#0891b2","#10b981","#f59e0b","#ef4444"];
+    const paletaCat  = ["#0891b2","#10b981","#f59e0b","#8b5cf6","#ef4444","#3b82f6","#ec4899"];
+
+    // ── SVG barras horizontales — top productos (unidades) ───────
+    const maxUnits  = Math.max(...topProductos.map((p) => p.unidades), 1);
+    const prodSvgH  = topProductos.length * 36 + 4;
+    const prodBars  = topProductos.map((p, i) => {
+      const bw    = Math.max(Math.round((p.unidades / maxUnits) * 240), 4);
+      const y     = i * 36;
+      const label = p.nombre.length > 21 ? p.nombre.substring(0, 21) + "…" : p.nombre;
+      const color = paletaProd[i % paletaProd.length];
+      const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}.`;
       return `<g transform="translate(0,${y})">
-        <text x="0" y="14" font-size="11" fill="#334155" font-family="Arial,sans-serif">${label}</text>
-        <rect x="0" y="20" width="${bw}" height="13" fill="${barColors[i % barColors.length]}" rx="3"/>
-        <text x="${bw + 6}" y="31" font-size="10" fill="#64748b" font-family="Arial,sans-serif">${p.unidades} u</text>
+        <text x="0" y="13" font-size="10" fill="#334155" font-family="Arial,sans-serif">${medal} ${label}</text>
+        <rect x="0" y="18" width="${bw}" height="12" fill="${color}" rx="3" opacity="0.9"/>
+        <text x="${bw + 5}" y="28" font-size="9" fill="#64748b" font-family="Arial,sans-serif">${p.unidades} u</text>
       </g>`;
     }).join("");
 
-    // SVG chart — ingresos por categoria
-    const catColors = ["#0891B2","#059669","#D97706","#7C3AED","#DC2626","#2563EB","#9333EA"];
-    const maxRev = Math.max(...ventasPorCategoria.map((c) => c.ingresos), 1);
-    const cats = ventasPorCategoria.slice(0, 7);
-    const catSvgH = cats.length * 38 + 8;
+    // ── SVG barras horizontales — ingresos por categoria ─────────
+    const cats    = ventasPorCategoria.slice(0, 7);
+    const maxRev  = Math.max(...cats.map((c) => c.ingresos), 1);
+    const catSvgH = cats.length * 36 + 4;
     const catBars = cats.map((c, i) => {
-      const bw = Math.max(Math.round((c.ingresos / maxRev) * 260), 4);
-      const y = i * 38;
-      const label = c.categoria.length > 22 ? c.categoria.substring(0, 22) + "…" : c.categoria;
+      const bw    = Math.max(Math.round((c.ingresos / maxRev) * 240), 4);
+      const y     = i * 36;
+      const label = c.categoria.length > 21 ? c.categoria.substring(0, 21) + "…" : c.categoria;
+      const color = paletaCat[i % paletaCat.length];
       return `<g transform="translate(0,${y})">
-        <text x="0" y="14" font-size="11" fill="#334155" font-family="Arial,sans-serif">${label}</text>
-        <rect x="0" y="20" width="${bw}" height="13" fill="${catColors[i % catColors.length]}" rx="3"/>
-        <text x="${bw + 6}" y="31" font-size="10" fill="#64748b" font-family="Arial,sans-serif">${formatMoney(c.ingresos)}</text>
+        <text x="0" y="13" font-size="10" fill="#334155" font-family="Arial,sans-serif">${label}</text>
+        <rect x="0" y="18" width="${bw}" height="12" fill="${color}" rx="3" opacity="0.9"/>
+        <text x="${bw + 5}" y="28" font-size="9" fill="#64748b" font-family="Arial,sans-serif">${formatMoney(c.ingresos)}</text>
       </g>`;
+    }).join("");
+
+    // ── SVG donut — distribución ingresos por categoría ──────────
+    const catTotal = cats.reduce((s, c) => s + c.ingresos, 0) || 1;
+    let donutStart = -90;
+    const donutSlices = cats.map((c, i) => {
+      const sweep = (c.ingresos / catTotal) * 360;
+      const path  = sweep < 0.5 ? "" : (() => {
+        if (sweep >= 359.99) {
+          return `<circle cx="70" cy="70" r="50" fill="${paletaCat[i % paletaCat.length]}" opacity="0.9"/>
+                  <circle cx="70" cy="70" r="30" fill="#fff"/>`;
+        }
+        const toRad  = (d: number) => ((d - 90) * Math.PI) / 180;
+        const p1x = 70 + 50 * Math.cos(toRad(donutStart));
+        const p1y = 70 + 50 * Math.sin(toRad(donutStart));
+        const p2x = 70 + 50 * Math.cos(toRad(donutStart + sweep));
+        const p2y = 70 + 50 * Math.sin(toRad(donutStart + sweep));
+        const i1x = 70 + 30 * Math.cos(toRad(donutStart));
+        const i1y = 70 + 30 * Math.sin(toRad(donutStart));
+        const i2x = 70 + 30 * Math.cos(toRad(donutStart + sweep));
+        const i2y = 70 + 30 * Math.sin(toRad(donutStart + sweep));
+        const lg  = sweep > 180 ? 1 : 0;
+        return `<path d="M${p1x},${p1y} A50,50 0 ${lg},1 ${p2x},${p2y} L${i2x},${i2y} A30,30 0 ${lg},0 ${i1x},${i1y} Z" fill="${paletaCat[i % paletaCat.length]}" opacity="0.9"/>`;
+      })();
+      donutStart += sweep;
+      return path;
+    }).join("");
+
+    // ── Tabla de top productos con ranking coloreado ──────────────
+    const topTableRows = topProductos.map((p, i) => {
+      const rankColor = i === 0 ? "#f59e0b" : i === 1 ? "#94a3b8" : i === 2 ? "#b45309" : "#cbd5e1";
+      const pct = Math.round((p.ingresos / (topProductos.reduce((s, x) => s + x.ingresos, 0) || 1)) * 100);
+      return `<tr>
+        <td style="padding:7px 10px;font-size:11px">
+          <span style="display:inline-block;width:20px;height:20px;border-radius:50%;background:${rankColor};color:#fff;text-align:center;line-height:20px;font-size:9px;font-weight:800;margin-right:6px">${i + 1}</span>
+          ${p.nombre}
+        </td>
+        <td style="padding:7px 10px;font-size:10px;color:#64748b">${p.categoria}</td>
+        <td style="padding:7px 10px;font-size:11px;text-align:right;font-weight:700">${p.unidades}</td>
+        <td style="padding:7px 10px;font-size:11px;text-align:right;font-weight:700;color:#059669">${formatMoney(p.ingresos)}</td>
+        <td style="padding:7px 10px;width:60px">
+          <div style="background:#e2e8f0;border-radius:3px;height:5px">
+            <div style="background:${paletaProd[i % paletaProd.length]};height:5px;width:${pct}%;border-radius:3px"></div>
+          </div>
+          <div style="font-size:8px;color:#94a3b8;text-align:right">${pct}%</div>
+        </td>
+      </tr>`;
     }).join("");
 
     try {
       const browser = await puppeteer.launch({ headless: true, args: ["--no-sandbox", "--disable-setuid-sandbox"] });
-      const page = await browser.newPage();
-      await page.setContent(`
-        <html>
-          <head><meta charset="utf-8"/>
-          <style>
-            *{box-sizing:border-box;margin:0;padding:0}
-            body{font-family:'Segoe UI',Arial,sans-serif;color:#0f172a;background:#f8fafc}
-            .header{background:linear-gradient(135deg,#0f172a 0%,#1e3a8a 100%);color:#fff;padding:30px 36px}
-            .header h1{font-size:28px;font-weight:700;margin-bottom:4px}
-            .header p{color:#bfdbfe;font-size:12px}
-            .body{padding:22px 32px 28px}
-            .kpi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px}
-            .kpi{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px}
-            .kpi-label{color:#64748b;font-size:11px;margin-bottom:8px}
-            .kpi-value{color:#0f172a;font-size:22px;font-weight:700;line-height:1.2}
-            .chart-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
-            .section{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin-bottom:14px}
-            .section h3{font-size:13px;font-weight:700;margin-bottom:14px;color:#0f172a}
-            table{width:100%;border-collapse:collapse}
-            th{background:#f1f5f9;color:#475569;text-align:left;font-size:10px;padding:8px 10px;text-transform:uppercase;letter-spacing:.04em}
-            td{border-top:1px solid #e2e8f0;font-size:12px;padding:9px 10px}
-            .right{text-align:right}
-            .foot{font-size:10px;text-align:center;color:#94a3b8;margin-top:12px;padding-top:10px;border-top:1px solid #e2e8f0}
-          </style>
-          </head>
-          <body>
-            <div class="header">
-              <h1>Informe Ejecutivo</h1>
-              <p>Generado el ${formatDate()} &nbsp;&middot;&nbsp; KPIs, graficos de ventas y analisis estrategico</p>
-            </div>
-            <div class="body">
-              <div class="kpi-grid">
-                <div class="kpi"><div class="kpi-label">Total Ordenes</div><div class="kpi-value">${resumen.totalOrdenes}</div></div>
-                <div class="kpi"><div class="kpi-label">Ventas Totales</div><div class="kpi-value">${formatMoney(resumen.ventasTotales)}</div></div>
-                <div class="kpi"><div class="kpi-label">Ticket Promedio</div><div class="kpi-value">${formatMoney(resumen.ticketPromedio)}</div></div>
-              </div>
+      const page    = await browser.newPage();
+      await page.setContent(`<!DOCTYPE html>
+<html><head><meta charset="utf-8"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;color:#0f172a;background:#f1f5f9;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.header{background:linear-gradient(135deg,#0f172a 0%,#1e3a8a 60%,#1d4ed8 100%);color:#fff;padding:26px 36px 22px;position:relative;overflow:hidden}
+.header::after{content:'';position:absolute;right:-40px;top:-40px;width:200px;height:200px;border-radius:50%;background:rgba(255,255,255,.06)}
+.header-top{display:flex;justify-content:space-between;align-items:flex-start}
+.header-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.15);color:#bfdbfe;font-size:10px;font-weight:700;border-radius:20px;padding:3px 12px;margin-bottom:8px;letter-spacing:.06em}
+.header h1{font-size:27px;font-weight:800;margin-bottom:3px;letter-spacing:-.4px}
+.header p{color:#93c5fd;font-size:11px}
+.kpi-strip{display:flex;gap:12px;margin-top:16px}
+.kpi-pill{background:rgba(255,255,255,.12);border-radius:10px;padding:8px 16px;flex:1;text-align:center}
+.kpi-pill .lbl{color:#bfdbfe;font-size:9px;text-transform:uppercase;letter-spacing:.06em}
+.kpi-pill .val{font-size:18px;font-weight:800;color:#fff;display:block;margin-top:1px}
+.body{padding:16px 28px 20px}
+.chart-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.card{background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.07)}
+.card-head{display:flex;align-items:center;gap:7px;padding:10px 14px;border-bottom:2px solid #f1f5f9;font-size:12px;font-weight:700}
+.card-dot{width:8px;height:8px;border-radius:50%}
+.card-body{padding:12px 14px}
+.donut-row{display:grid;grid-template-columns:140px 1fr;gap:12px;align-items:center}
+.legend-list{display:flex;flex-direction:column;gap:5px}
+.legend-item{display:flex;align-items:center;gap:7px;font-size:10px}
+.legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+table{width:100%;border-collapse:collapse}
+thead th{background:#f8fafc;color:#475569;text-align:left;font-size:9px;padding:6px 10px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #e2e8f0}
+tbody tr:nth-child(even){background:#f8fafc}
+.insight-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}
+.insight{background:#fff;border-radius:10px;padding:12px;border-left:3px solid var(--ic);box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.insight-label{font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+.insight-val{font-size:16px;font-weight:800;color:var(--ic)}
+.insight-desc{font-size:9px;color:#94a3b8;margin-top:2px}
+.foot{font-size:9px;text-align:center;color:#94a3b8;margin-top:10px;padding-top:8px;border-top:1px solid #e2e8f0;display:flex;justify-content:center;gap:14px}
+</style>
+</head><body>
+<div class="header">
+  <div class="header-top">
+    <div>
+      <div class="header-badge">&#9733; INFORME EJECUTIVO</div>
+      <h1>Informe Ejecutivo</h1>
+      <p>KPIs, graficos de ventas y analisis estrategico del periodo</p>
+    </div>
+  </div>
+  <div class="kpi-strip">
+    <div class="kpi-pill">
+      <div class="lbl">&#128203; Total Ordenes</div>
+      <span class="val">${resumen.totalOrdenes}</span>
+    </div>
+    <div class="kpi-pill">
+      <div class="lbl">&#128176; Ventas Totales</div>
+      <span class="val">${formatMoney(resumen.ventasTotales)}</span>
+    </div>
+    <div class="kpi-pill">
+      <div class="lbl">&#127919; Ticket Promedio</div>
+      <span class="val">${formatMoney(resumen.ticketPromedio)}</span>
+    </div>
+  </div>
+</div>
+<div class="body">
+  <div class="insight-grid">
+    <div class="insight" style="--ic:#2563eb">
+      <div class="insight-label">Ordenes procesadas</div>
+      <div class="insight-val">${resumen.totalOrdenes}</div>
+      <div class="insight-desc">total acumulado</div>
+    </div>
+    <div class="insight" style="--ic:#059669">
+      <div class="insight-label">Ingresos totales</div>
+      <div class="insight-val">${formatMoney(resumen.ventasTotales)}</div>
+      <div class="insight-desc">ventas consolidadas</div>
+    </div>
+    <div class="insight" style="--ic:#7c3aed">
+      <div class="insight-label">Ticket promedio</div>
+      <div class="insight-val">${formatMoney(resumen.ticketPromedio)}</div>
+      <div class="insight-desc">por orden</div>
+    </div>
+  </div>
 
-              <div class="chart-row">
-                <div class="section">
-                  <h3>Top Productos — Unidades</h3>
-                  <svg width="100%" height="${prodSvgH}" viewBox="0 0 340 ${prodSvgH}" preserveAspectRatio="xMinYMin meet">${prodBars}</svg>
-                </div>
-                <div class="section">
-                  <h3>Ingresos por Categoria</h3>
-                  <svg width="100%" height="${catSvgH}" viewBox="0 0 340 ${catSvgH}" preserveAspectRatio="xMinYMin meet">${catBars}</svg>
-                </div>
-              </div>
+  <div class="chart-row">
+    <div class="card">
+      <div class="card-head"><div class="card-dot" style="background:#6366f1"></div>Top Productos — Unidades vendidas</div>
+      <div class="card-body">
+        <svg width="100%" height="${prodSvgH}" viewBox="0 0 290 ${prodSvgH}" preserveAspectRatio="xMinYMin meet">${prodBars}</svg>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div class="card-dot" style="background:#0891b2"></div>Ingresos por Categoria</div>
+      <div class="card-body">
+        <svg width="100%" height="${catSvgH}" viewBox="0 0 290 ${catSvgH}" preserveAspectRatio="xMinYMin meet">${catBars}</svg>
+      </div>
+    </div>
+  </div>
 
-              <div class="section">
-                <h3>Resumen de Indicadores</h3>
-                <table>
-                  <thead><tr><th>Indicador</th><th class="right">Resultado</th></tr></thead>
-                  <tbody>
-                    <tr><td>Ordenes procesadas</td><td class="right">${resumen.totalOrdenes}</td></tr>
-                    <tr><td>Ingresos consolidados</td><td class="right">${formatMoney(resumen.ventasTotales)}</td></tr>
-                    <tr><td>Ingreso promedio por orden</td><td class="right">${formatMoney(resumen.ticketPromedio)}</td></tr>
-                  </tbody>
-                </table>
-              </div>
+  <div class="card" style="margin-bottom:12px">
+    <div class="card-head"><div class="card-dot" style="background:#f59e0b"></div>Distribucion de Ingresos + Ranking de Productos</div>
+    <div class="card-body">
+      <div class="donut-row">
+        <div>
+          <svg width="140" height="140" viewBox="0 0 140 140">
+            ${donutSlices}
+            <circle cx="70" cy="70" r="24" fill="#fff"/>
+            <text x="70" y="67" text-anchor="middle" font-size="10" font-weight="800" fill="#0f172a" font-family="Arial">${formatMoney(resumen.ventasTotales).split('.')[0]}</text>
+            <text x="70" y="80" text-anchor="middle" font-size="8" fill="#64748b" font-family="Arial">ingresos</text>
+          </svg>
+        </div>
+        <div class="legend-list">
+          ${cats.map((c, i) => `<div class="legend-item">
+            <div class="legend-dot" style="background:${paletaCat[i % paletaCat.length]}"></div>
+            <span style="flex:1;color:#334155">${c.categoria}</span>
+            <span style="font-weight:700;color:#0f172a">${formatMoney(c.ingresos)}</span>
+            <span style="color:#94a3b8;font-size:9px;margin-left:5px">${Math.round((c.ingresos / catTotal) * 100)}%</span>
+          </div>`).join("")}
+        </div>
+      </div>
+    </div>
+  </div>
 
-              <div class="section">
-                <h3>Conclusiones de Gestion</h3>
-                <p style="line-height:1.6;color:#334155;font-size:12px">
-                  Se observa un comportamiento comercial positivo con una relacion estable entre volumen de ordenes y ticket promedio.
-                  Las categorias con mayor ingreso deben recibir atencion especial en estrategias de stock y marketing.
-                  Para el siguiente periodo se recomienda reforzar cross-selling en las categorias lideres y revisar semanalmente el ticket promedio.
-                </p>
-              </div>
-              <div class="foot">${empresa} &nbsp;|&nbsp; Informe Ejecutivo &mdash; uso estrategico para direccion</div>
-            </div>
-          </body>
-        </html>
-      `);
+  <div class="card" style="margin-bottom:12px">
+    <div class="card-head"><div class="card-dot" style="background:#f59e0b"></div>Ranking de Productos por Ingresos</div>
+    <table>
+      <thead><tr><th>Producto</th><th>Categoria</th><th style="text-align:right">Unidades</th><th style="text-align:right">Ingresos</th><th style="text-align:center">Participacion</th></tr></thead>
+      <tbody>${topTableRows}</tbody>
+    </table>
+  </div>
+
+  <div class="foot">
+    <span>&#128197; Generado el ${formatDate()}</span>
+    <span>&#127970; ${empresa}</span>
+    <span>&#128274; Informe Ejecutivo — estrategico para direccion</span>
+  </div>
+</div>
+</body></html>`, { waitUntil: "networkidle0" });
       const pdf = await page.pdf({ format: "A4", printBackground: true, margin: { top: "0", right: "0", bottom: "0", left: "0" } });
       await browser.close();
       return Buffer.from(pdf);
