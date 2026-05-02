@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 const DEFAULTS = {
-  nombre: "TiendaVirtual",
+  nombre: "MI EMPRESA",
   logo: ""
 };
 

@@ -6,6 +6,7 @@ import { ClipboardCopy, LogIn, Pointer, Loader2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { apiClient } from "../services/api-client";
 import { useAuthStore } from "../stores/auth.store";
+import { useStoreConfig } from "../stores/store-config.store";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -41,6 +42,7 @@ const demoCredentials = [
 export const LoginPage = () => {
   const navigate = useNavigate();
   const setSession = useAuthStore((s) => s.setSession);
+  const storeConfig = useStoreConfig();
 
   const form = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
@@ -94,11 +96,15 @@ export const LoginPage = () => {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 bg-brand-700 rounded-2xl mb-4 shadow-lg">
-            <span className="text-white text-2xl font-bold">TV</span>
+          <div className="inline-flex items-center justify-center w-14 h-14 bg-brand-700 rounded-2xl mb-4 shadow-lg overflow-hidden">
+            {storeConfig.logo ? (
+              <img src={storeConfig.logo} alt={storeConfig.nombre} className="w-full h-full object-contain" />
+            ) : (
+              <span className="text-white text-2xl font-bold">{storeConfig.nombre.slice(0, 2).toUpperCase()}</span>
+            )}
           </div>
           <h1 className="text-2xl font-bold text-gray-800">Iniciar sesión</h1>
-          <p className="text-gray-500 text-sm mt-1">Ingresa a tu cuenta de TiendaVirtual</p>
+          <p className="text-gray-500 text-sm mt-1">Ingresa a tu cuenta de {storeConfig.nombre}</p>
         </div>
 
         {/* Card */}

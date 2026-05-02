@@ -930,11 +930,6 @@ export const AdminPage = () => {
   };
 
   const printTableReport = (title: string, headers: string[], rows: Array<Array<string | number>>) => {
-    const win = window.open("", "_blank", "width=1000,height=750");
-    if (!win) {
-      toast.error("No se pudo abrir la ventana del reporte");
-      return;
-    }
     const tableRows = rows
       .map((row) => {
         const cells = row.map((cell) => `<td>${String(cell)}</td>`).join("");
@@ -964,7 +959,12 @@ export const AdminPage = () => {
       </body></html>`;
     const blob = new Blob([html], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
-    win.location.href = url;
+    const win = window.open(url, "_blank", "width=1000,height=750");
+    if (!win) {
+      toast.error("El navegador bloqueó la ventana. Permite ventanas emergentes para este sitio e intenta de nuevo.");
+      URL.revokeObjectURL(url);
+      return;
+    }
     setTimeout(() => URL.revokeObjectURL(url), 10_000);
   };
 
