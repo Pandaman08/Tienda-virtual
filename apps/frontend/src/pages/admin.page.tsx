@@ -638,15 +638,7 @@ export const AdminPage = () => {
     return response.data.data;
   };
 
-  const openReceiptWindow = (detail: OrdenDetalleAdmin, autoPrint = false, receipt?: Window | null) => {
-    if (!receipt) {
-      receipt = window.open("", "_blank", "width=520,height=900");
-    }
-    if (!receipt) {
-      toast.error("No se pudo abrir la ventana del comprobante");
-      return;
-    }
-
+  const buildReceiptHtml = (detail: OrdenDetalleAdmin, autoPrint = false) => {
     const customerName = detail.cliente ? `${detail.cliente.nombre} ${detail.cliente.apellido}` : `Cliente #${detail.cliente_id}`;
     const lineItems = detail.items
       .map(
@@ -660,7 +652,7 @@ export const AdminPage = () => {
       )
       .join("");
 
-    const html = `
+    return `
       <!doctype html>
       <html>
         <head>
@@ -732,11 +724,19 @@ export const AdminPage = () => {
         </body>
       </html>
     `;
+  };
 
+  const openReceiptWindow = (detail: OrdenDetalleAdmin, autoPrint = false) => {
+    const html = buildReceiptHtml(detail, autoPrint);
     const blob = new Blob([html], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
-    receipt.location.href = url;
-    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    const win = window.open(url, "_blank", "width=520,height=900");
+    if (!win) {
+      toast.error("El navegador bloqueó la ventana. Permite ventanas emergentes para este sitio e intenta de nuevo.");
+      URL.revokeObjectURL(url);
+      return;
+    }
+    setTimeout(() => URL.revokeObjectURL(url), 30_000);
   };
 
   const openOrderDetail = async (orderId: number) => {
@@ -754,32 +754,29 @@ export const AdminPage = () => {
   };
 
   const downloadOrderDetail = async (order: OrdenAdmin) => {
-    const win = window.open("", "_blank", "width=520,height=900");
-    if (!win) {
-      toast.error("No se pudo abrir la ventana del comprobante");
-      return;
-    }
     try {
       const detail = orderDetail?.id === order.id ? orderDetail : await fetchOrderDetail(order.id);
-      openReceiptWindow(detail, false, win);
+      const html = buildReceiptHtml(detail);
+      const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `comprobante-${detail.numero_orden}.html`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
     } catch (error) {
-      win.close();
       const message = error instanceof Error ? error.message : "No se pudo descargar el detalle";
       toast.error(message);
     }
   };
 
   const printOrderDetail = async (order: OrdenAdmin) => {
-    const win = window.open("", "_blank", "width=520,height=900");
-    if (!win) {
-      toast.error("No se pudo abrir la ventana del comprobante");
-      return;
-    }
     try {
       const detail = orderDetail?.id === order.id ? orderDetail : await fetchOrderDetail(order.id);
-      openReceiptWindow(detail, true, win);
+      openReceiptWindow(detail, true);
     } catch (error) {
-      win.close();
       const message = error instanceof Error ? error.message : "No se pudo imprimir el comprobante";
       toast.error(message);
     }
@@ -2132,7 +2129,7 @@ export const AdminPage = () => {
                     <button
                       type="button"
                       className="h-11 px-4 rounded-xl bg-fuchsia-600 text-white text-sm font-semibold hover:bg-fuchsia-700 inline-flex items-center gap-2"
-                      onClick={() => printOrderDetail(orderDetail)}
+                      onClick={() => openReceiptWindow(orderDetail, true)}
                     >
                       <Printer className="w-4 h-4" />
                       Imprimir Comprobante
