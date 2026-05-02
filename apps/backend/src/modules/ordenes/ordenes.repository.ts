@@ -69,7 +69,19 @@ export const ordenesRepository = {
     });
   },
 
-  listByCliente: (clienteId: number) => prisma.ord_ordenes.findMany({ where: { cliente_id: clienteId, activo: true } }),
+  listByCliente: (clienteId: number) =>
+    prisma.ord_ordenes.findMany({
+      where: { cliente_id: clienteId, activo: true },
+      orderBy: { created_at: "desc" },
+      include: {
+        items: {
+          where: { activo: true },
+          include: {
+            producto: { select: { id: true, nombre: true, imagen_url: true, categoria: true } }
+          }
+        }
+      }
+    }),
 
   findByIdWithDetail: async (id: number) => {
     const orden = await prisma.ord_ordenes.findFirst({

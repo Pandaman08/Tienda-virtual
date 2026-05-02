@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { ChevronDown, LayoutDashboard, LogOut, Settings, ShoppingCart, User } from "lucide-react";
+import { ChevronDown, ClipboardList, LayoutDashboard, LogOut, Settings, ShoppingCart, User } from "lucide-react";
 import { useAuthStore } from "../stores/auth.store";
 import { useCartStore } from "../stores/cart.store";
 import { useStoreConfig } from "../stores/store-config.store";
@@ -169,6 +169,22 @@ export const NavBar = ({ onCartClick }: NavBarProps) => {
                           <p className="text-xs text-gray-400">Ver datos de tu cuenta</p>
                         </div>
                       </button>
+
+                      {rol === "CLIENTE" && (
+                        <button
+                          type="button"
+                          onClick={() => { setUserMenuOpen(false); navigate("/pedidos"); }}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left cursor-pointer border-0 bg-transparent"
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center flex-shrink-0">
+                            <ClipboardList className="w-4 h-4 text-indigo-600" />
+                          </div>
+                          <div>
+                            <p className="font-medium">Mis Pedidos</p>
+                            <p className="text-xs text-gray-400">Historial de compras</p>
+                          </div>
+                        </button>
+                      )}
 
                       <button
                         type="button"

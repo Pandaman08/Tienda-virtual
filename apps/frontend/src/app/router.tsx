@@ -10,6 +10,7 @@ import { LoginPage } from "../pages/login.page";
 import { TiendaPage } from "../pages/tienda.page";
 import { PerfilPage } from "../pages/perfil.page";
 import { ConfiguracionPage } from "../pages/configuracion.page";
+import { PedidosPage } from "../pages/pedidos.page";
 
 export const AppRouter = () => {
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -41,6 +42,14 @@ export const AppRouter = () => {
             element={
               <ProtectedRoute roles={["CLIENTE", "ADMIN"]}>
                 <ConfiguracionPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/pedidos"
+            element={
+              <ProtectedRoute roles={["CLIENTE", "ADMIN"]}>
+                <PedidosPage />
               </ProtectedRoute>
             }
           />
