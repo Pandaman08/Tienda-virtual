@@ -100,6 +100,252 @@ const buildStyledPdfKitReport = (title: string, resumen: Resumen, narrative: str
   });
 };
 
+// ─── PDFKit visual: Informe Ejecutivo ──────────────────────────────────────
+const buildGestionPdfKit = (
+  resumen: Resumen,
+  topProductos: Array<{ nombre: string; categoria: string; unidades: number; ingresos: number }>,
+  ventasPorCategoria: Array<{ categoria: string; ingresos: number }>,
+  empresa: string
+): Promise<Buffer> => {
+  const doc    = new PDFDocument({ size: "A4", margin: 0 });
+  const chunks: Buffer[] = [];
+  const PW = 595.28, BX = 32, BW = PW - 64;
+
+  return new Promise((resolve) => {
+    doc.on("data", (c) => chunks.push(c as Buffer));
+    doc.on("end",  () => resolve(Buffer.concat(chunks)));
+
+    // ── Header ────────────────────────────────────────────────────
+    doc.rect(0, 0, PW, 86).fill("#0f172a");
+    doc.rect(0, 0, PW, 3).fill("#3b82f6");
+    doc.fillColor("#fff").font("Helvetica-Bold").fontSize(22).text("Informe Ejecutivo", BX, 18);
+    doc.fillColor("#93c5fd").font("Helvetica").fontSize(10)
+       .text("KPIs · Graficos de ventas · Analisis estrategico del periodo", BX, 48);
+    doc.fillColor("#64748b").fontSize(8).text(`Emitido: ${formatDate()} · ${empresa}`, BX, 64);
+
+    // ── KPI cards ──────────────────────────────────────────────────
+    const KY = 100, KW = 157, KH = 66;
+    ([
+      { label: "TOTAL ORDENES",   value: `${resumen.totalOrdenes}`,             color: "#2563eb" },
+      { label: "VENTAS TOTALES",  value: formatMoney(resumen.ventasTotales),    color: "#059669" },
+      { label: "TICKET PROMEDIO", value: formatMoney(resumen.ticketPromedio),   color: "#7c3aed" }
+    ] as const).forEach((k, i) => {
+      const x = BX + i * (KW + 11);
+      doc.roundedRect(x, KY, KW, KH, 8).fill("#fff");
+      doc.rect(x, KY + 8, 4, KH - 16).fill(k.color);
+      doc.fillColor("#64748b").font("Helvetica").fontSize(8).text(k.label, x + 12, KY + 13, { width: KW - 18 });
+      doc.fillColor(k.color).font("Helvetica-Bold").fontSize(16).text(k.value, x + 12, KY + 31, { width: KW - 18 });
+    });
+
+    let Y = KY + KH + 16;
+    const chartMaxW = 215;
+
+    // ── Barchart: Top Productos ────────────────────────────────────
+    const prodColors = ["#6366f1","#8b5cf6","#3b82f6","#0891b2","#10b981","#f59e0b","#ef4444"];
+    const maxU       = Math.max(...topProductos.map(p => p.unidades), 1);
+    const prodList   = topProductos.slice(0, 6);
+    const cardH1     = 18 + prodList.length * 20 + 10;
+    doc.rect(BX, Y, BW, cardH1).fill("#fff");
+    doc.rect(BX, Y, 3, cardH1).fill("#6366f1");
+    doc.fillColor("#0f172a").font("Helvetica-Bold").fontSize(10).text("Top Productos — Unidades Vendidas", BX + 10, Y + 6);
+    Y += 20;
+    prodList.forEach((p, i) => {
+      const bw  = Math.max(Math.round((p.unidades / maxU) * chartMaxW), 4);
+      const lbl = p.nombre.length > 23 ? p.nombre.substring(0, 23) + "…" : p.nombre;
+      doc.fillColor("#334155").font("Helvetica").fontSize(9).text(lbl, BX + 10, Y + 2, { width: 145 });
+      doc.roundedRect(BX + 160, Y, bw, 13, 2).fill(prodColors[i % prodColors.length]);
+      doc.fillColor("#64748b").font("Helvetica").fontSize(8).text(`${p.unidades}`, BX + 164 + bw, Y + 2);
+      Y += 20;
+    });
+    Y += 14;
+
+    // ── Barchart: Ingresos por Categoría ──────────────────────────
+    const catColors2 = ["#0891b2","#10b981","#f59e0b","#8b5cf6","#ef4444","#3b82f6","#ec4899"];
+    const cats6      = ventasPorCategoria.slice(0, 6);
+    const maxR       = Math.max(...cats6.map(c => c.ingresos), 1);
+    const cardH2     = 18 + cats6.length * 20 + 10;
+    doc.rect(BX, Y, BW, cardH2).fill("#fff");
+    doc.rect(BX, Y, 3, cardH2).fill("#0891b2");
+    doc.fillColor("#0f172a").font("Helvetica-Bold").fontSize(10).text("Ingresos por Categoria", BX + 10, Y + 6);
+    Y += 20;
+    cats6.forEach((c, i) => {
+      const bw  = Math.max(Math.round((c.ingresos / maxR) * chartMaxW), 4);
+      const lbl = c.categoria.length > 23 ? c.categoria.substring(0, 23) + "…" : c.categoria;
+      doc.fillColor("#334155").font("Helvetica").fontSize(9).text(lbl, BX + 10, Y + 2, { width: 145 });
+      doc.roundedRect(BX + 160, Y, bw, 13, 2).fill(catColors2[i % catColors2.length]);
+      doc.fillColor("#64748b").font("Helvetica").fontSize(8).text(formatMoney(c.ingresos), BX + 164 + bw, Y + 2);
+      Y += 20;
+    });
+    Y += 14;
+
+    // ── Ranking table ──────────────────────────────────────────────
+    doc.rect(BX, Y, BW, 18).fill("#f1f5f9");
+    doc.rect(BX, Y, 3, 18).fill("#f59e0b");
+    doc.fillColor("#475569").font("Helvetica-Bold").fontSize(8);
+    (["#", "Producto", "Categoria", "Unid.", "Ingresos"] as const).forEach((h, ci) => {
+      const cols = [BX + 6, BX + 22, BX + 196, BX + 310, BX + 370];
+      doc.text(h, cols[ci], Y + 5);
+    });
+    Y += 18;
+    const rankColors2 = ["#f59e0b","#94a3b8","#b45309","#cbd5e1","#cbd5e1","#cbd5e1","#cbd5e1"];
+    topProductos.slice(0, 7).forEach((p, i) => {
+      if (Y > 798) return;
+      doc.rect(BX, Y, BW, 18).fill(i % 2 === 0 ? "#fff" : "#f8fafc");
+      doc.roundedRect(BX + 4, Y + 3, 13, 13, 2).fill(rankColors2[i] || "#cbd5e1");
+      doc.fillColor("#fff").font("Helvetica-Bold").fontSize(7).text(`${i + 1}`, BX + 4, Y + 5, { width: 13, align: "center" });
+      const nm  = p.nombre.length > 25   ? p.nombre.substring(0, 25) + "…"   : p.nombre;
+      const cat = p.categoria.length > 15 ? p.categoria.substring(0, 15) + "…" : p.categoria;
+      doc.fillColor("#334155").font("Helvetica").fontSize(9).text(nm,  BX + 22,  Y + 4, { width: 168 });
+      doc.fillColor("#64748b").text(cat,                                BX + 196, Y + 4, { width: 108 });
+      doc.fillColor("#0f172a").text(`${p.unidades}`,                    BX + 310, Y + 4, { width: 54  });
+      doc.fillColor("#059669").font("Helvetica-Bold").text(formatMoney(p.ingresos), BX + 365, Y + 4, { width: 116, align: "right" });
+      Y += 18;
+    });
+
+    // ── Footer ────────────────────────────────────────────────────
+    const FY = Math.min(Y + 8, 825);
+    doc.moveTo(BX, FY).lineTo(PW - BX, FY).lineWidth(0.5).strokeColor("#e2e8f0").stroke();
+    doc.fillColor("#94a3b8").font("Helvetica").fontSize(8)
+       .text(`${empresa}  ·  Informe Ejecutivo — estrategico para direccion  ·  ${formatDate()}`,
+             BX, FY + 6, { width: BW, align: "center" });
+    doc.end();
+  });
+};
+
+// ─── PDFKit visual: Informe Operacional ────────────────────────────────────
+const buildOperacionalPdfKit = (
+  resumen: Resumen,
+  topProductos: Array<{ nombre: string; categoria: string; unidades: number; ingresos: number }>,
+  stockItems: Array<{ stock_disponible: number; producto: { nombre: string; categoria: string; stock_minimo: number } }>,
+  agotados: number,
+  criticos: number,
+  normales: number,
+  empresa: string
+): Promise<Buffer> => {
+  const doc    = new PDFDocument({ size: "A4", margin: 0 });
+  const chunks: Buffer[] = [];
+  const PW = 595.28, BX = 32, BW = PW - 64;
+  const total = stockItems.length || 1;
+
+  return new Promise((resolve) => {
+    doc.on("data", (c) => chunks.push(c as Buffer));
+    doc.on("end",  () => resolve(Buffer.concat(chunks)));
+
+    // ── Header ────────────────────────────────────────────────────
+    doc.rect(0, 0, PW, 86).fill("#0c4a6e");
+    doc.rect(0, 0, PW, 3).fill("#0ea5e9");
+    doc.fillColor("#fff").font("Helvetica-Bold").fontSize(22).text("Informe Operacional", BX, 18);
+    doc.fillColor("#bae6fd").font("Helvetica").fontSize(10)
+       .text("Detalle operativo de ventas, stock critico y metricas del negocio", BX, 48);
+    doc.fillColor("#64748b").fontSize(8).text(`Emitido: ${formatDate()} · ${empresa}`, BX, 64);
+
+    // ── KPI cards ──────────────────────────────────────────────────
+    const KY = 100, KW = 157, KH = 66;
+    ([
+      { label: "TOTAL ORDENES",   value: `${resumen.totalOrdenes}`,             color: "#2563eb" },
+      { label: "VENTAS TOTALES",  value: formatMoney(resumen.ventasTotales),    color: "#059669" },
+      { label: "TICKET PROMEDIO", value: formatMoney(resumen.ticketPromedio),   color: "#7c3aed" }
+    ] as const).forEach((k, i) => {
+      const x = BX + i * (KW + 11);
+      doc.roundedRect(x, KY, KW, KH, 8).fill("#fff");
+      doc.rect(x, KY + 8, 4, KH - 16).fill(k.color);
+      doc.fillColor("#64748b").font("Helvetica").fontSize(8).text(k.label, x + 12, KY + 13, { width: KW - 18 });
+      doc.fillColor(k.color).font("Helvetica-Bold").fontSize(16).text(k.value, x + 12, KY + 31, { width: KW - 18 });
+    });
+
+    let Y = KY + KH + 14;
+
+    // ── Semáforo de inventario ──────────────────────────────────────
+    const semH = 72;
+    doc.rect(BX, Y, BW, semH).fill("#fff");
+    doc.rect(BX, Y, 3, semH).fill("#0369a1");
+    doc.fillColor("#0f172a").font("Helvetica-Bold").fontSize(10).text("Estado del Inventario", BX + 10, Y + 9);
+    doc.fillColor("#64748b").font("Helvetica").fontSize(8).text(`${total} productos activos`, BX + 10, Y + 22);
+    const semCols = [
+      { label: "Agotados", count: agotados, color: "#dc2626" },
+      { label: "Criticos", count: criticos, color: "#f97316" },
+      { label: "Normales", count: normales, color: "#22c55e" }
+    ];
+    const semSlot = (BW - 20) / 3;
+    semCols.forEach((s, i) => {
+      const sx  = BX + 10 + i * semSlot;
+      const sy  = Y + 36;
+      const pct = Math.round((s.count / total) * 100);
+      const bW  = Math.round(semSlot * 0.72);
+      doc.roundedRect(sx, sy - 2, 22, 22, 3).fill(s.color);
+      doc.fillColor("#fff").font("Helvetica-Bold").fontSize(10)
+         .text(`${s.count}`, sx, sy + 3, { width: 22, align: "center" });
+      doc.fillColor("#0f172a").font("Helvetica-Bold").fontSize(9).text(s.label, sx + 27, sy + 3);
+      doc.roundedRect(sx + 27, sy + 15, bW, 5, 2).fill("#e2e8f0");
+      if (pct > 0) doc.roundedRect(sx + 27, sy + 15, Math.max(Math.round(bW * pct / 100), 2), 5, 2).fill(s.color);
+      doc.fillColor("#64748b").font("Helvetica").fontSize(7)
+         .text(`${pct}%`, sx + 27 + bW + 3, sy + 14);
+    });
+    Y += semH + 12;
+
+    // ── Tabla de inventario ────────────────────────────────────────
+    doc.rect(BX, Y, BW, 18).fill("#f1f5f9");
+    doc.rect(BX, Y, 3, 18).fill("#0369a1");
+    doc.fillColor("#475569").font("Helvetica-Bold").fontSize(8);
+    doc.text("Producto",  BX + 8,   Y + 5);
+    doc.text("Categoria", BX + 178, Y + 5);
+    doc.text("Stock",     BX + 308, Y + 5);
+    doc.text("Estado",    BX + 442, Y + 5);
+    Y += 18;
+    stockItems.slice(0, 18).forEach((item, i) => {
+      if (Y > 776) return;
+      const disp    = item.stock_disponible;
+      const min     = item.producto.stock_minimo;
+      const agotado = disp === 0;
+      const critico = !agotado && disp <= min;
+      const rowBg   = agotado ? "#fff5f5" : critico ? "#fff9f0" : i % 2 === 0 ? "#fff" : "#f8fafc";
+      doc.rect(BX, Y, BW, 18).fill(rowBg);
+      if (agotado || critico) doc.rect(BX, Y, 3, 18).fill(agotado ? "#dc2626" : "#f97316");
+      const dispColor = agotado ? "#dc2626" : critico ? "#f97316" : "#22c55e";
+      const pNombre   = item.producto.nombre.length > 21 ? item.producto.nombre.substring(0, 21) + "…" : item.producto.nombre;
+      doc.fillColor("#0f172a").font("Helvetica").fontSize(9).text(pNombre, BX + 8, Y + 4, { width: 163 });
+      doc.fillColor("#64748b").text(item.producto.categoria, BX + 178, Y + 4, { width: 122 });
+      // Mini progress bar
+      const maxBar = Math.max(disp, min, 1);
+      doc.roundedRect(BX + 308, Y + 4, 60, 7, 2).fill("#e2e8f0");
+      if (disp > 0) doc.roundedRect(BX + 308, Y + 4, Math.max(Math.round(60 * (disp / maxBar)), 2), 7, 2).fill(dispColor);
+      doc.fillColor(dispColor).font("Helvetica-Bold").fontSize(8).text(`${disp}/${min}`, BX + 374, Y + 4, { width: 60 });
+      const badgeText = agotado ? "AGOTADO" : critico ? "CRITICO" : "NORMAL";
+      doc.fillColor(dispColor).font("Helvetica-Bold").fontSize(8).text(badgeText, BX + 442, Y + 5, { width: 80 });
+      Y += 18;
+    });
+
+    // ── Top productos (barras) ─────────────────────────────────────
+    Y += 10;
+    if (Y < 760) {
+      const topList  = topProductos.slice(0, 5);
+      const maxI     = Math.max(...topList.map(p => p.ingresos), 1);
+      const tpColors = ["#6366f1","#8b5cf6","#3b82f6","#0891b2","#10b981"];
+      const tpH      = 18 + topList.length * 18 + 8;
+      doc.rect(BX, Y, BW, tpH).fill("#fff");
+      doc.rect(BX, Y, 3, tpH).fill("#6366f1");
+      doc.fillColor("#0f172a").font("Helvetica-Bold").fontSize(10).text("Top Productos — Ingresos", BX + 10, Y + 6);
+      Y += 20;
+      topList.forEach((p, i) => {
+        const bw  = Math.max(Math.round((p.ingresos / maxI) * 210), 4);
+        const lbl = p.nombre.length > 22 ? p.nombre.substring(0, 22) + "…" : p.nombre;
+        doc.fillColor("#334155").font("Helvetica").fontSize(9).text(lbl, BX + 10, Y + 2, { width: 143 });
+        doc.roundedRect(BX + 158, Y, bw, 11, 2).fill(tpColors[i % tpColors.length]);
+        doc.fillColor("#64748b").font("Helvetica").fontSize(8).text(formatMoney(p.ingresos), BX + 162 + bw, Y + 2);
+        Y += 18;
+      });
+    }
+
+    // ── Footer ────────────────────────────────────────────────────
+    const FY = Math.min(Y + 8, 825);
+    doc.moveTo(BX, FY).lineTo(PW - BX, FY).lineWidth(0.5).strokeColor("#e2e8f0").stroke();
+    doc.fillColor("#94a3b8").font("Helvetica").fontSize(8)
+       .text(`${empresa}  ·  Informe Operacional — uso interno  ·  ${formatDate()}`,
+             BX, FY + 6, { width: BW, align: "center" });
+    doc.end();
+  });
+};
+
 export const reportesService = {
   kpis: reportesRepository.ventasResumen,
 
@@ -331,12 +577,7 @@ td{border-top:1px solid #f8fafc;vertical-align:middle}
       await browser.close();
       return Buffer.from(pdf);
     } catch {
-      return buildStyledPdfKitReport(
-        "Informe Operacional",
-        resumen,
-        `El informe operacional registra ${agotados} productos agotados y ${criticos} en stock critico. Se recomienda revisar el inventario de forma inmediata y gestionar ordenes de reposicion para los articulos con mayor rotacion.`,
-        empresa
-      );
+      return buildOperacionalPdfKit(resumen, topProductos, stockItems, agotados, criticos, normales, empresa);
     }
   },
 
@@ -569,12 +810,7 @@ tbody tr:nth-child(even){background:#f8fafc}
       await browser.close();
       return Buffer.from(pdf);
     } catch {
-      return buildStyledPdfKitReport(
-        "Informe Ejecutivo",
-        resumen,
-        "Desde una perspectiva de direccion, los indicadores reflejan eficiencia comercial y buena respuesta del mercado. Se sugiere priorizar acciones sobre segmentacion de clientes y optimizacion del mix de productos.",
-        empresa
-      );
+      return buildGestionPdfKit(resumen, topProductos, ventasPorCategoria, empresa);
     }
   }
 };
