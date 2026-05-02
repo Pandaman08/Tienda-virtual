@@ -174,6 +174,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;color:#0f172a;background:#f8fafc}
 .header{background:linear-gradient(135deg,#0369a1 0%,#0ea5e9 100%);color:#fff;padding:28px 36px}
 .header h1{font-size:26px;font-weight:700;margin-bottom:4px}
 .header p{color:#bae6fd;font-size:12px}
+.header .badge{display:inline-block;background:rgba(255,255,255,.18);color:#e0f2fe;font-size:11px;font-weight:600;border-radius:6px;padding:2px 10px;margin-bottom:8px}
 .body{padding:20px 32px 28px}
 .kpi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px}
 .kpi{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px}
@@ -195,8 +196,9 @@ td{border-top:1px solid #f1f5f9}
 </style>
 </head><body>
 <div class="header">
-  <h1>Reporte Operacional</h1>
-  <p>Generado el ${formatDate()} &nbsp;&middot;&nbsp; Analisis de stock y rendimiento operativo</p>
+  <div class="badge">INFORME OPERACIONAL</div>
+  <h1>Informe Operacional</h1>
+  <p>Generado el ${formatDate()} &nbsp;&middot;&nbsp; Detalle operativo de ventas, stock critico y metricas del negocio</p>
 </div>
 <div class="body">
   <div class="kpi-grid">
@@ -219,7 +221,7 @@ td{border-top:1px solid #f1f5f9}
     <table><thead><tr><th>Producto</th><th>Categoria</th><th style="text-align:right">Unidades</th><th style="text-align:right">Ingresos</th></tr></thead>
     <tbody>${topRows}</tbody></table>
   </div>
-  <div class="foot">${empresa} &nbsp;|&nbsp; Reporte operacional de uso interno</div>
+  <div class="foot">${empresa} &nbsp;|&nbsp; Informe Operacional &mdash; uso interno</div>
 </div>
 </body></html>`;
 
@@ -232,9 +234,9 @@ td{border-top:1px solid #f1f5f9}
       return Buffer.from(pdf);
     } catch {
       return buildStyledPdfKitReport(
-        "Reporte Operacional",
+        "Informe Operacional",
         resumen,
-        `El reporte operacional registra ${agotados} productos agotados y ${criticos} en stock critico. Se recomienda revisar el inventario de forma inmediata y gestionar ordenes de reposicion para los articulos con mayor rotacion.`,
+        `El informe operacional registra ${agotados} productos agotados y ${criticos} en stock critico. Se recomienda revisar el inventario de forma inmediata y gestionar ordenes de reposicion para los articulos con mayor rotacion.`,
         empresa
       );
     }
@@ -307,8 +309,8 @@ td{border-top:1px solid #f1f5f9}
           </head>
           <body>
             <div class="header">
-              <h1>Informe de Gestion</h1>
-              <p>Generado el ${formatDate()}</p>
+              <h1>Informe Ejecutivo</h1>
+              <p>Generado el ${formatDate()} &nbsp;&middot;&nbsp; KPIs, graficos de ventas y analisis estrategico</p>
             </div>
             <div class="body">
               <div class="kpi-grid">
@@ -348,7 +350,7 @@ td{border-top:1px solid #f1f5f9}
                   Para el siguiente periodo se recomienda reforzar cross-selling en las categorias lideres y revisar semanalmente el ticket promedio.
                 </p>
               </div>
-              <div class="foot">${empresa} &nbsp;|&nbsp; Reporte estrategico para direccion</div>
+              <div class="foot">${empresa} &nbsp;|&nbsp; Informe Ejecutivo &mdash; uso estrategico para direccion</div>
             </div>
           </body>
         </html>
@@ -358,7 +360,7 @@ td{border-top:1px solid #f1f5f9}
       return Buffer.from(pdf);
     } catch {
       return buildStyledPdfKitReport(
-        "Informe de Gestion",
+        "Informe Ejecutivo",
         resumen,
         "Desde una perspectiva de direccion, los indicadores reflejan eficiencia comercial y buena respuesta del mercado. Se sugiere priorizar acciones sobre segmentacion de clientes y optimizacion del mix de productos.",
         empresa

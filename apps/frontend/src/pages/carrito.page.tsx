@@ -1,4 +1,4 @@
-﻿import { useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { jsPDF } from "jspdf";
 import { Link, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
@@ -82,6 +82,33 @@ export const CarritoPage = () => {
 
   const envioTotal = envioMetodo === "DOMICILIO" ? envioPrice : 0;
   const total      = subtotal + igv + envioTotal;
+
+  // Config de empresa (cargada desde API para que sea igual en todos los navegadores)
+  const [empConfig, setEmpConfig] = useState({
+    nombre:   localStorage.getItem("emp_nombre")   ?? "MI EMPRESA",
+    ruc:      localStorage.getItem("emp_ruc")      ?? "",
+    direccion:localStorage.getItem("emp_direccion") ?? "",
+    telefono: localStorage.getItem("emp_telefono")  ?? "",
+    simbolo:  localStorage.getItem("emp_moneda_simbolo") ?? "S/",
+    igvPct:   localStorage.getItem("emp_igv")      ?? "18",
+    logo:     localStorage.getItem("emp_logo")     ?? "",
+  });
+  useEffect(() => {
+    apiClient.get("/configuracion").then((res) => {
+      const d = res.data?.data;
+      if (!d) return;
+      setEmpConfig({
+        nombre:    d.nombre          ?? empConfig.nombre,
+        ruc:       d.ruc             ?? "",
+        direccion: d.direccion       ?? "",
+        telefono:  d.telefono        ?? "",
+        simbolo:   d.moneda_simbolo  ?? "S/",
+        igvPct:    d.igv             ?? "18",
+        logo:      d.logo            ?? "",
+      });
+    }).catch(() => {/* usa valores de localStorage como fallback */});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const applyTestCard = () => {
     const d = TEST_CARD[marcaTarjeta];
@@ -192,13 +219,28 @@ export const CarritoPage = () => {
     doc.setFont("helvetica", "bold");
     doc.text("COMPROBANTE DE PAGO", W / 2, 9, { align: "center" });
 
-    let y = 24;
+    let y = 22;
     doc.setTextColor(30, 30, 30);
 
-    // Order info
-    doc.setFontSize(20);
+    // Nombre y datos de la tienda
+    doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
-    doc.text("Pedido #" + orderId, margin, y); y += 9;
+    doc.text(empConfig.nombre, W / 2, y, { align: "center" }); y += 6;
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(80, 80, 80);
+    if (empConfig.ruc)       { doc.text("RUC: " + empConfig.ruc, W / 2, y, { align: "center" }); y += 4; }
+    if (empConfig.direccion) { doc.text(empConfig.direccion, W / 2, y, { align: "center" }); y += 4; }
+    if (empConfig.telefono)  { doc.text("Tel: " + empConfig.telefono, W / 2, y, { align: "center" }); y += 4; }
+    y += 3;
+    doc.setDrawColor(200, 200, 200);
+    doc.line(margin, y, W - margin, y); y += 5;
+
+    // Order info
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(30, 30, 30);
+    doc.text("Pedido #" + orderId, margin, y); y += 7;
 
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
@@ -246,11 +288,11 @@ export const CarritoPage = () => {
     doc.setFont("helvetica", "normal");
     doc.setTextColor(80, 80, 80);
     doc.text("Subtotal", col1, y);
-    doc.text("S/ " + snap.subtotal.toFixed(2), W - margin, y, { align: "right" }); y += 5;
-    doc.text("IGV (18%)", col1, y);
-    doc.text("S/ " + snap.igv.toFixed(2), W - margin, y, { align: "right" }); y += 5;
+    doc.text(empConfig.simbolo + " " + snap.subtotal.toFixed(2), W - margin, y, { align: "right" }); y += 5;
+    doc.text("IGV (" + empConfig.igvPct + "%)", col1, y);
+    doc.text(empConfig.simbolo + " " + snap.igv.toFixed(2), W - margin, y, { align: "right" }); y += 5;
     doc.text("Envio", col1, y);
-    doc.text(snap.envioTotal === 0 ? "Gratis" : "S/ " + snap.envioTotal.toFixed(2), W - margin, y, { align: "right" }); y += 6;
+    doc.text(snap.envioTotal === 0 ? "Gratis" : empConfig.simbolo + " " + snap.envioTotal.toFixed(2), W - margin, y, { align: "right" }); y += 6;
 
     // Total band
     doc.setFillColor(240, 253, 250);
@@ -259,7 +301,7 @@ export const CarritoPage = () => {
     doc.setFontSize(10);
     doc.setTextColor(15, 118, 110);
     doc.text("TOTAL PAGADO", col1, y + 3);
-    doc.text("S/ " + snap.total.toFixed(2), W - margin, y + 3, { align: "right" }); y += 14;
+    doc.text(empConfig.simbolo + " " + snap.total.toFixed(2), W - margin, y + 3, { align: "right" }); y += 14;
 
     // Footer
     doc.setDrawColor(200, 200, 200);
