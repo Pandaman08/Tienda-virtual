@@ -638,8 +638,10 @@ export const AdminPage = () => {
     return response.data.data;
   };
 
-  const openReceiptWindow = (detail: OrdenDetalleAdmin, autoPrint = false) => {
-    const receipt = window.open("", "_blank", "width=520,height=900");
+  const openReceiptWindow = (detail: OrdenDetalleAdmin, autoPrint = false, receipt?: Window | null) => {
+    if (!receipt) {
+      receipt = window.open("", "_blank", "width=520,height=900");
+    }
     if (!receipt) {
       toast.error("No se pudo abrir la ventana del comprobante");
       return;
@@ -752,20 +754,32 @@ export const AdminPage = () => {
   };
 
   const downloadOrderDetail = async (order: OrdenAdmin) => {
+    const win = window.open("", "_blank", "width=520,height=900");
+    if (!win) {
+      toast.error("No se pudo abrir la ventana del comprobante");
+      return;
+    }
     try {
       const detail = orderDetail?.id === order.id ? orderDetail : await fetchOrderDetail(order.id);
-      openReceiptWindow(detail, false);
+      openReceiptWindow(detail, false, win);
     } catch (error) {
+      win.close();
       const message = error instanceof Error ? error.message : "No se pudo descargar el detalle";
       toast.error(message);
     }
   };
 
   const printOrderDetail = async (order: OrdenAdmin) => {
+    const win = window.open("", "_blank", "width=520,height=900");
+    if (!win) {
+      toast.error("No se pudo abrir la ventana del comprobante");
+      return;
+    }
     try {
       const detail = orderDetail?.id === order.id ? orderDetail : await fetchOrderDetail(order.id);
-      openReceiptWindow(detail, true);
+      openReceiptWindow(detail, true, win);
     } catch (error) {
+      win.close();
       const message = error instanceof Error ? error.message : "No se pudo imprimir el comprobante";
       toast.error(message);
     }
