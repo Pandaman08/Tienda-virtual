@@ -169,3 +169,21 @@ model seg_auditoria_acciones {
   @@index([usuario_id, created_at(sort: Desc)])
   @@map("seg_auditoria_acciones")
 }
+
+model cfg_tienda {
+  id              Int      @id @default(1)
+  nombre          String   @default("MI EMPRESA") @db.VarChar(120)
+  logo            String?  @db.Text
+  ruc             String?  @db.VarChar(20)
+  direccion       String?  @db.VarChar(200)
+  telefono        String?  @db.VarChar(30)
+  email           String?  @db.VarChar(120)
+  igv             String   @default("18") @db.VarChar(5)
+  moneda_simbolo  String   @default("S/") @db.VarChar(5)
+  moneda_nombre   String   @default("Soles") @db.VarChar(30)
+  serie_boleta    String   @default("B001") @db.VarChar(20)
+  serie_factura   String   @default("F001") @db.VarChar(20)
+  updated_at      DateTime @updatedAt
+
+  @@map("cfg_tienda")
+}

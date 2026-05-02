@@ -251,7 +251,29 @@ export const AdminPage = () => {
   const [empresaSerieFactura, setEmpresaSerieFactura] = useState(() => localStorage.getItem("emp_serie_factura") ?? "F001");
   const [empresaLogo, setEmpresaLogo] = useState(() => localStorage.getItem("emp_logo") ?? "");
 
-  const saveEmpresaConfig = () => {
+  // Cargar configuración desde API al montar (sincroniza con DB)
+  useEffect(() => {
+    apiClient.get("/configuracion").then((res) => {
+      const d = res.data?.data;
+      if (!d) return;
+      if (d.nombre)          { localStorage.setItem("emp_nombre", d.nombre);                    setEmpresaNombre(d.nombre); }
+      if (d.ruc != null)     { localStorage.setItem("emp_ruc", d.ruc ?? "");                    setEmpresaRuc(d.ruc ?? ""); }
+      if (d.direccion!=null) { localStorage.setItem("emp_direccion", d.direccion ?? "");        setEmpresaDireccion(d.direccion ?? ""); }
+      if (d.telefono!=null)  { localStorage.setItem("emp_telefono", d.telefono ?? "");          setEmpresaTelefono(d.telefono ?? ""); }
+      if (d.email!=null)     { localStorage.setItem("emp_email", d.email ?? "");                setEmpresaEmail(d.email ?? ""); }
+      if (d.igv)             { localStorage.setItem("emp_igv", d.igv);                          setEmpresaIgv(d.igv); }
+      if (d.moneda_simbolo)  { localStorage.setItem("emp_moneda_simbolo", d.moneda_simbolo);    setEmpresaMonedaSimbolo(d.moneda_simbolo); }
+      if (d.moneda_nombre)   { localStorage.setItem("emp_moneda_nombre", d.moneda_nombre);      setEmpresaMonedaNombre(d.moneda_nombre); }
+      if (d.serie_boleta)    { localStorage.setItem("emp_serie_boleta", d.serie_boleta);        setEmpresaSerieBoleta(d.serie_boleta); }
+      if (d.serie_factura)   { localStorage.setItem("emp_serie_factura", d.serie_factura);      setEmpresaSerieFactura(d.serie_factura); }
+      if (d.logo != null)    { localStorage.setItem("emp_logo", d.logo ?? "");                  setEmpresaLogo(d.logo ?? ""); }
+      globalThis.dispatchEvent(new CustomEvent("store-config-updated"));
+    }).catch(() => { /* usa valores de localStorage como fallback */ });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const saveEmpresaConfig = async () => {
+    // 1. Guardar en localStorage para respuesta inmediata en la misma pestaña
     localStorage.setItem("emp_nombre", empresaNombre);
     localStorage.setItem("emp_ruc", empresaRuc);
     localStorage.setItem("emp_direccion", empresaDireccion);
@@ -264,7 +286,26 @@ export const AdminPage = () => {
     localStorage.setItem("emp_serie_factura", empresaSerieFactura);
     localStorage.setItem("emp_logo", empresaLogo);
     globalThis.dispatchEvent(new CustomEvent("store-config-updated"));
-    toast.success("Configuración de empresa guardada");
+
+    // 2. Persistir en la base de datos para que sea visible en todos los navegadores
+    try {
+      await apiClient.put("/configuracion", {
+        nombre: empresaNombre,
+        logo: empresaLogo || null,
+        ruc: empresaRuc || null,
+        direccion: empresaDireccion || null,
+        telefono: empresaTelefono || null,
+        email: empresaEmail || null,
+        igv: empresaIgv,
+        moneda_simbolo: empresaMonedaSimbolo,
+        moneda_nombre: empresaMonedaNombre,
+        serie_boleta: empresaSerieBoleta,
+        serie_factura: empresaSerieFactura,
+      });
+      toast.success("Configuración guardada y sincronizada");
+    } catch {
+      toast.error("Guardado local OK, pero no se pudo sincronizar con el servidor");
+    }
   };
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
